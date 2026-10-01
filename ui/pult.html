@@ -3,282 +3,426 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500&display=swap">
 <style>
-/* Layout: one narrow column — settings panel on top, answer feed below; summary (status) before detail */
+/* Layout: chat switcher on top (sidebar on wide screens), thread in the middle, composer with per-chat settings below */
 :root{
   --bg:#eceeed; --surface:#fafbfa; --ink:#1b2220; --muted:#5a6561; --line:#d3d9d6;
-  --accent:#1d6b62; --accent-ink:#ffffff; --soft:#d9e9e5; --warn:#8f6210; --bad:#a3352b;
+  --accent:#1d6b62; --accent-ink:#ffffff; --soft:#d9e9e5; --warn:#8f6210; --bad:#a3352b; --mine:#dfe7e4;
   --f-display:"Unbounded","IBM Plex Sans",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#121715; --surface:#1a201e; --ink:#e3eae7; --muted:#95a19c; --line:#2d3734;
-  --accent:#62b9ad; --accent-ink:#0d1412; --soft:#1f322e; --warn:#e2b55e; --bad:#ec8a7f; color-scheme:dark}}
+  --accent:#62b9ad; --accent-ink:#0d1412; --soft:#1f322e; --warn:#e2b55e; --bad:#ec8a7f; --mine:#24302d; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#121715; --surface:#1a201e; --ink:#e3eae7; --muted:#95a19c; --line:#2d3734;
-  --accent:#62b9ad; --accent-ink:#0d1412; --soft:#1f322e; --warn:#e2b55e; --bad:#ec8a7f; color-scheme:dark}
+  --accent:#62b9ad; --accent-ink:#0d1412; --soft:#1f322e; --warn:#e2b55e; --bad:#ec8a7f; --mine:#24302d; color-scheme:dark}
 
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;padding-block:24px 56px;padding-inline:16px}
-main{max-width:760px;margin:0 auto;display:grid;gap:20px}
-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
-h1{font-family:var(--f-display);font-weight:500;font-size:22px;margin:0;letter-spacing:-.01em;text-wrap:balance}
-.lede{margin:4px 0 0;color:var(--muted);max-width:60ch}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;padding-block:20px 48px;padding-inline:16px}
+.app{max-width:1040px;margin:0 auto;display:grid;gap:16px;grid-template-columns:1fr}
+@media (min-width:860px){.app{grid-template-columns:240px minmax(0,1fr);align-items:start}}
 
-.status{font-family:var(--f-mono);font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
+/* chat list */
+.side{display:grid;gap:10px;min-width:0}
+@media (min-width:860px){.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}}
+.brand{font-family:var(--f-display);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em}
+.new{font:inherit;font-weight:600;padding:9px 14px;border-radius:8px;border:1px dashed var(--accent);background:transparent;color:var(--accent);cursor:pointer;text-align:left}
+.new:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chats{list-style:none;margin:0;padding:0;display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+@media (min-width:860px){.chats{flex-direction:column;overflow:visible;padding:0}}
+.chats button{font:inherit;width:100%;text-align:left;display:grid;gap:2px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-width:160px;max-width:240px}
+@media (min-width:860px){.chats button{max-width:none;min-width:0}}
+.chats button[aria-current="true"]{border-color:var(--accent);background:var(--soft)}
+.chats button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.c-title{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-meta{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--line);flex:none}
+.dot[data-s="sent"]{background:var(--warn)}
+.dot[data-s="working"]{background:var(--accent)}
+.dot[data-s="done"]{background:var(--accent);box-shadow:0 0 0 2px var(--soft)}
+.side-empty{color:var(--muted);font-size:13px;margin:0}
+
+/* main */
+.main{display:grid;gap:14px;min-width:0}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+#title{flex:1;min-width:0;font:inherit;font-family:var(--f-display);font-weight:500;font-size:17px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;color:var(--ink)}
+#title:hover{border-color:var(--line)}
+#title:focus-visible{outline:none;border-color:var(--accent);background:var(--surface)}
+.status{font-family:var(--f-mono);font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
 .status[data-s="sent"]{border-color:var(--warn);color:var(--warn)}
 .status[data-s="working"]{border-color:var(--accent);color:var(--accent)}
 .status[data-s="done"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.del{font:inherit;font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.del.armed{border-color:var(--bad);color:var(--bad)}
 
-form{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 16px;display:grid;gap:22px}
-fieldset{border:0;margin:0;padding:0;display:grid;gap:10px;min-width:0}
-legend,.lbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:0;margin-bottom:10px}
-.lbl{display:block;margin-bottom:8px}
+.thread{display:grid;gap:10px;min-width:0}
+.empty{border:1px dashed var(--line);border-radius:10px;padding:16px;color:var(--muted)}
+.msg{border-radius:10px;padding:12px 14px;display:grid;gap:6px;min-width:0}
+.msg.user{background:var(--mine);justify-self:end;max-width:min(560px,92%)}
+.msg.bot{background:var(--surface);border:1px solid var(--line)}
+.m-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}
+.m-src{font-weight:600;font-size:14px}
+.badge{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:4px;background:var(--soft);color:var(--accent)}
+.badge.mine{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.meta{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.m-body{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+
+/* composer */
+form{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px}
+textarea{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;resize:vertical}
+textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#question{min-height:88px}
+#notes{min-height:52px}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-size:13px;color:var(--muted);list-style:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";transition:transform .15s}
+details[open] summary::before{transform:rotate(90deg)}
+summary b{color:var(--ink);font-weight:600}
+.settings{display:grid;gap:18px;margin-top:14px}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+legend,.lbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:0;margin-bottom:8px}
+.lbl{display:block}
 .hint{color:var(--muted);font-size:13px;margin:0}
-
-.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{position:relative;cursor:pointer}
 .chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
-.chip span{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--line);border-radius:999px;background:var(--bg);font-size:14px;transition:background .15s,border-color .15s}
+.chip span{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--bg);font-size:14px;transition:background .15s,border-color .15s}
 .chip small{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
 .chip input:checked + span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .chip input:checked + span small{color:var(--accent-ink);opacity:.8}
 .chip input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
-
-.row{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media (max-width:560px){.row{grid-template-columns:1fr}}
-
 .budget{display:flex;align-items:center;gap:12px}
 .budget input{flex:1;accent-color:var(--accent);min-width:0}
 .budget output{font-family:var(--f-mono);font-variant-numeric:tabular-nums;min-width:4.5ch;text-align:right}
-
 .toggles{display:grid;gap:8px}
-.toggle{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;cursor:pointer}
+.toggle{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;cursor:pointer}
 .toggle input{margin:3px 0 0;width:17px;height:17px;accent-color:var(--accent)}
 .toggle b{font-weight:500}
 .toggle .hint{grid-column:2}
-
-textarea{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;resize:vertical}
-textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-#question{min-height:110px}
-#notes{min-height:60px}
-
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
-button{font:inherit;font-weight:600;padding:10px 20px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer}
-button:disabled{opacity:.5;cursor:default}
-button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.msg{font-size:14px;color:var(--muted)}
-.msg.err{color:var(--bad)}
-
-.feed{display:grid;gap:12px}
-.feed h2{font-family:var(--f-display);font-weight:500;font-size:16px;margin:8px 0 0}
-.empty{border:1px dashed var(--line);border-radius:10px;padding:18px 16px;color:var(--muted)}
-.ans{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:8px;min-width:0}
-.ans-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px}
-.ans-src{font-weight:600}
-.badge{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:4px;background:var(--soft);color:var(--accent)}
-.badge.mine{background:transparent;border:1px solid var(--line);color:var(--muted)}
-.meta{margin-left:auto;font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-.ans-body{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
-.ans-q{font-size:13px;color:var(--muted);margin:0}
-
+.send{font:inherit;font-weight:600;padding:10px 20px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.send:disabled{opacity:.5;cursor:default}
+.send:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.note{font-size:14px;color:var(--muted)}
+.note.err{color:var(--bad)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
-<main>
-  <header>
-    <div>
-      <h1>Консилиум</h1>
-      <p class="lede">Настрой режим и модели, задай вопрос и нажми «Отправить». Потом напиши в чат «го»: Claude прочитает пульт, выполнит и положит ответы сюда.</p>
+<div class="app">
+  <aside class="side">
+    <h1 class="brand">Консилиум</h1>
+    <button type="button" class="new" id="new-chat">+ Новая беседа</button>
+    <ul class="chats" id="chats" aria-label="Беседы"></ul>
+    <p class="side-empty" id="side-empty">Бесед пока нет. Создай первую или просто задай вопрос.</p>
+  </aside>
+
+  <section class="main">
+    <div class="top">
+      <input id="title" aria-label="Название беседы" value="Новая беседа" maxlength="80">
+      <span class="status" id="status" data-s="none">Не отправлено</span>
+      <button type="button" class="del" id="del" hidden>Удалить</button>
     </div>
-    <span class="status" id="status" data-s="none">Ещё не отправлялось</span>
-  </header>
 
-  <form id="panel" novalidate>
-    <fieldset>
-      <legend>Режим</legend>
-      <div class="chips">
-        <label class="chip"><input type="radio" name="mode" id="mode-plain" value="plain"><span>Обычный</span></label>
-        <label class="chip"><input type="radio" name="mode" id="mode-deep" value="deep" checked><span>Глубоко</span></label>
-        <label class="chip"><input type="radio" name="mode" id="mode-debate" value="debate"><span>Дебаты</span></label>
-        <label class="chip"><input type="radio" name="mode" id="mode-psy" value="psy"><span>Психолог</span></label>
+    <div class="thread" id="thread" aria-live="polite">
+      <div class="empty">Задай вопрос внизу и нажми «Отправить», потом напиши Claude в чат «го». Ответы моделей с пометкой «дословно» и разборы Claude появятся здесь.</div>
+    </div>
+
+    <form id="composer" novalidate>
+      <div>
+        <label class="lbl" for="question">Вопрос</label>
+        <textarea id="question" name="question" placeholder="Например: какие аргументы за и против того, что Китай станет главной державой к 2050 году?"></textarea>
       </div>
-      <p class="hint" id="mode-hint"></p>
-    </fieldset>
 
-    <fieldset>
-      <legend>Модели</legend>
-      <div class="chips">
-        <label class="chip"><input type="checkbox" name="models" id="m-claude" value="claude" checked><span>Claude в чате <small>подписка</small></span></label>
-        <label class="chip"><input type="checkbox" name="models" id="m-kimi" value="kimi-k3" checked><span>Kimi K3 <small>ключ</small></span></label>
-        <label class="chip"><input type="checkbox" name="models" id="m-qwen" value="qwen"><span>Qwen <small>ключ</small></span></label>
-        <label class="chip"><input type="checkbox" name="models" id="m-fable" value="fable-5-1"><span>Fable 5.1 API <small>ключ</small></span></label>
-      </div>
-      <p class="hint">«Ключ» значит, что для этой модели нужен API-ключ. Без ключей работает только Claude в чате.</p>
-    </fieldset>
-
-    <div class="row">
-      <fieldset>
-        <legend>Глубина размышлений</legend>
-        <div class="chips">
-          <label class="chip"><input type="radio" name="depth" id="d-low" value="low"><span>Быстро</span></label>
-          <label class="chip"><input type="radio" name="depth" id="d-med" value="medium"><span>Средне</span></label>
-          <label class="chip"><input type="radio" name="depth" id="d-high" value="high" checked><span>Глубоко</span></label>
-          <label class="chip"><input type="radio" name="depth" id="d-max" value="max"><span>Максимум</span></label>
+      <details id="settings-box">
+        <summary>Настройки беседы: <b id="summary-text"></b></summary>
+        <div class="settings">
+          <fieldset>
+            <legend>Режим</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="mode" id="mode-plain" value="plain"><span>Обычный</span></label>
+              <label class="chip"><input type="radio" name="mode" id="mode-deep" value="deep" checked><span>Глубоко</span></label>
+              <label class="chip"><input type="radio" name="mode" id="mode-debate" value="debate"><span>Дебаты</span></label>
+              <label class="chip"><input type="radio" name="mode" id="mode-psy" value="psy"><span>Психолог</span></label>
+            </div>
+            <p class="hint" id="mode-hint"></p>
+          </fieldset>
+          <fieldset>
+            <legend>Модели</legend>
+            <div class="chips">
+              <label class="chip"><input type="checkbox" name="models" id="m-claude" value="claude" checked><span>Claude в чате <small>подписка</small></span></label>
+              <label class="chip"><input type="checkbox" name="models" id="m-kimi" value="kimi-k3" checked><span>Kimi K3 <small>ключ</small></span></label>
+              <label class="chip"><input type="checkbox" name="models" id="m-qwen" value="qwen"><span>Qwen <small>ключ</small></span></label>
+              <label class="chip"><input type="checkbox" name="models" id="m-fable" value="fable-5-1"><span>Fable 5.1 API <small>ключ</small></span></label>
+            </div>
+            <p class="hint">«Ключ» значит, что для модели нужен API-ключ. Без ключей работает только Claude в чате.</p>
+          </fieldset>
+          <div class="row">
+            <fieldset>
+              <legend>Глубина размышлений</legend>
+              <div class="chips">
+                <label class="chip"><input type="radio" name="depth" id="d-low" value="low"><span>Быстро</span></label>
+                <label class="chip"><input type="radio" name="depth" id="d-med" value="medium"><span>Средне</span></label>
+                <label class="chip"><input type="radio" name="depth" id="d-high" value="high" checked><span>Глубоко</span></label>
+                <label class="chip"><input type="radio" name="depth" id="d-max" value="max"><span>Максимум</span></label>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Бюджет на вопрос</legend>
+              <div class="budget">
+                <input type="range" id="budget" name="budget" min="0.5" max="10" step="0.5" value="2">
+                <output id="budget-out" for="budget">$2.0</output>
+              </div>
+              <p class="hint">Только для платных вызовов моделей по ключам.</p>
+            </fieldset>
+          </div>
+          <fieldset>
+            <legend>Как работать</legend>
+            <div class="toggles">
+              <label class="toggle"><input type="checkbox" id="o-verbatim" name="verbatim" checked><b>Ответы других моделей дословно</b><span class="hint">Кладу их как есть, свои комментарии отдельно.</span></label>
+              <label class="toggle"><input type="checkbox" id="o-critic" name="critic" checked><b>Критик</b><span class="hint">Отдельный проход ищет ошибки и слабые места.</span></label>
+              <label class="toggle"><input type="checkbox" id="o-web" name="web"><b>Поиск в интернете</b><span class="hint">Проверяю факты по источникам и даю ссылки.</span></label>
+              <label class="toggle"><input type="checkbox" id="o-argue" name="argue"><b>Спорь со мной</b><span class="hint">Ищу самые сильные возражения к твоей позиции.</span></label>
+            </div>
+          </fieldset>
+          <div>
+            <label class="lbl" for="notes">Пометки для Claude</label>
+            <textarea id="notes" name="notes" placeholder="Контекст, что уже знаешь, что важно учесть"></textarea>
+          </div>
         </div>
-      </fieldset>
-      <fieldset>
-        <legend>Бюджет на вопрос</legend>
-        <div class="budget">
-          <input type="range" id="budget" name="budget" min="0.5" max="10" step="0.5" value="2">
-          <output id="budget-out" for="budget">$2.0</output>
-        </div>
-        <p class="hint">Только для платных вызовов моделей по ключам.</p>
-      </fieldset>
-    </div>
+      </details>
 
-    <fieldset>
-      <legend>Как работать</legend>
-      <div class="toggles">
-        <label class="toggle"><input type="checkbox" id="o-verbatim" name="verbatim" checked><b>Ответы других моделей дословно</b><span class="hint">Кладу их сюда как есть, свои комментарии отдельно.</span></label>
-        <label class="toggle"><input type="checkbox" id="o-critic" name="critic" checked><b>Критик</b><span class="hint">Отдельный проход ищет ошибки и слабые места в ответах.</span></label>
-        <label class="toggle"><input type="checkbox" id="o-web" name="web"><b>Поиск в интернете</b><span class="hint">Проверяю факты по источникам и даю ссылки.</span></label>
-        <label class="toggle"><input type="checkbox" id="o-argue" name="argue"><b>Спорь со мной</b><span class="hint">Ищу самые сильные возражения к твоей позиции.</span></label>
+      <div class="actions">
+        <button type="submit" class="send" id="send">Отправить</button>
+        <span class="note" id="note" role="status"></span>
       </div>
-    </fieldset>
-
-    <div>
-      <label class="lbl" for="question">Вопрос</label>
-      <textarea id="question" name="question" placeholder="Например: какие аргументы за и против того, что Китай станет главной державой к 2050 году?"></textarea>
-    </div>
-    <div>
-      <label class="lbl" for="notes">Пометки для Claude</label>
-      <textarea id="notes" name="notes" placeholder="Контекст, что уже знаешь, что важно учесть"></textarea>
-    </div>
-
-    <div class="actions">
-      <button type="submit" id="send">Отправить</button>
-      <span class="msg" id="msg" role="status"></span>
-    </div>
-  </form>
-
-  <section class="feed" aria-labelledby="feed-h">
-    <h2 id="feed-h">Ответы</h2>
-    <div id="answers"><div class="empty">Ответов пока нет. Отправь вопрос и напиши в чат «го». Здесь появятся ответы моделей, отмеченные «дословно», и мои разборы.</div></div>
+    </form>
   </section>
-</main>
+</div>
 
 <script>
 const $ = s => document.querySelector(s);
-const form = $('#panel');
+const form = $('#composer');
+const MODE_NAME = { plain:'Обычный', deep:'Глубоко', debate:'Дебаты', psy:'Психолог' };
+const DEPTH_NAME = { low:'быстро', medium:'средне', high:'глубоко', max:'максимум' };
 const MODE_HINT = {
   plain: 'Один ответ Claude, как в обычном чате, но с твоими настройками.',
   deep: 'Несколько независимых черновиков, критик ищет ошибки, затем итоговый ответ.',
-  debate: 'Две модели отвечают и спорят друг с другом, судья разбирает, кто где прав.',
+  debate: 'Две модели отвечают и спорят, судья разбирает, кто где прав.',
   psy: 'Разговор по методике психолога: вопросы, гипотезы, без поддакивания.'
 };
-const STATUS = {
-  sent: 'Отправлено, напиши в чат «го»',
-  working: 'Claude работает…',
-  done: 'Готово'
+const STATUS = { sent:'Отправлено, напиши в чат «го»', working:'Claude работает…', done:'Готово' };
+const DEFAULTS = { mode:'deep', models:['claude','kimi-k3'], depth:'high', budget:2,
+  options:{ verbatim:true, critic:true, web:false, argue:false }, notes:'' };
+
+let db = null, chats = [], activeId = null, unsubMsgs = null, saveTimer = null;
+const store = {
+  get(){ try { return localStorage.getItem('konsilium.active'); } catch { return null; } },
+  set(v){ try { localStorage.setItem('konsilium.active', v); } catch {} }
 };
 
-function showHint(){ $('#mode-hint').textContent = MODE_HINT[new FormData(form).get('mode')] || ''; }
-function showBudget(){ $('#budget-out').textContent = '$' + Number($('#budget').value).toFixed(1); }
-form.addEventListener('change', showHint);
-$('#budget').addEventListener('input', showBudget);
-showHint(); showBudget();
-
-function readForm(){
+function readSettings(){
   const fd = new FormData(form);
   return {
-    mode: fd.get('mode'),
-    models: fd.getAll('models'),
-    depth: fd.get('depth'),
+    mode: fd.get('mode'), models: fd.getAll('models'), depth: fd.get('depth'),
     budget: Number(fd.get('budget')),
     options: { verbatim: fd.has('verbatim'), critic: fd.has('critic'), web: fd.has('web'), argue: fd.has('argue') },
-    question: String(fd.get('question') || '').trim(),
     notes: String(fd.get('notes') || '').trim()
   };
 }
-function fillForm(d){
-  if (d.mode) form.querySelectorAll('input[name=mode]').forEach(i => i.checked = i.value === d.mode);
-  if (Array.isArray(d.models)) form.querySelectorAll('input[name=models]').forEach(i => i.checked = d.models.includes(i.value));
-  if (d.depth) form.querySelectorAll('input[name=depth]').forEach(i => i.checked = i.value === d.depth);
-  if (typeof d.budget === 'number') $('#budget').value = d.budget;
-  const o = d.options || {};
-  ['verbatim','critic','web','argue'].forEach(k => { if (k in o) $('#o-' + k).checked = !!o[k]; });
-  if (typeof d.question === 'string') $('#question').value = d.question;
-  if (typeof d.notes === 'string') $('#notes').value = d.notes;
-  showHint(); showBudget();
+function fillSettings(d){
+  d = { ...DEFAULTS, ...d, options: { ...DEFAULTS.options, ...(d && d.options) } };
+  form.querySelectorAll('input[name=mode]').forEach(i => i.checked = i.value === d.mode);
+  form.querySelectorAll('input[name=models]').forEach(i => i.checked = d.models.includes(i.value));
+  form.querySelectorAll('input[name=depth]').forEach(i => i.checked = i.value === d.depth);
+  $('#budget').value = d.budget;
+  ['verbatim','critic','web','argue'].forEach(k => $('#o-' + k).checked = !!d.options[k]);
+  $('#notes').value = d.notes || '';
+  refreshLabels();
 }
-function setStatus(s){
-  const el = $('#status');
-  el.dataset.s = s || 'none';
-  el.textContent = STATUS[s] || 'Ещё не отправлялось';
+function refreshLabels(){
+  const s = readSettings();
+  $('#mode-hint').textContent = MODE_HINT[s.mode] || '';
+  $('#budget-out').textContent = '$' + s.budget.toFixed(1);
+  $('#summary-text').textContent = [MODE_NAME[s.mode], DEPTH_NAME[s.depth], s.models.length + ' мод.'].join(' · ');
 }
-function say(text, isErr){ const m = $('#msg'); m.textContent = text; m.classList.toggle('err', !!isErr); }
-
+function say(text, err){ const n = $('#note'); n.textContent = text; n.classList.toggle('err', !!err); }
+function setStatus(s){ const el = $('#status'); el.dataset.s = s || 'none'; el.textContent = STATUS[s] || 'Не отправлено'; }
 function fmtTime(iso){
-  try { return new Date(iso).toLocaleString('ru-RU', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}); }
+  try { return new Date(iso).toLocaleString('ru-RU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); }
   catch { return ''; }
 }
-function renderAnswers(snap){
-  const box = $('#answers');
-  if (snap.empty){
-    box.innerHTML = '<div class="empty">Ответов пока нет. Отправь вопрос и напиши в чат «го». Здесь появятся ответы моделей, отмеченные «дословно», и мои разборы.</div>';
+
+function renderChats(){
+  const ul = $('#chats');
+  $('#side-empty').hidden = chats.length > 0;
+  ul.replaceChildren(...chats.map(c => {
+    const li = document.createElement('li');
+    const b = document.createElement('button'); b.type = 'button';
+    b.setAttribute('aria-current', c.id === activeId ? 'true' : 'false');
+    const t = document.createElement('span'); t.className = 'c-title'; t.textContent = c.title || 'Новая беседа';
+    const m = document.createElement('span'); m.className = 'c-meta';
+    const dot = document.createElement('span'); dot.className = 'dot'; dot.dataset.s = c.status || 'none';
+    const lbl = document.createElement('span'); lbl.textContent = (MODE_NAME[c.mode] || '') + (c.updatedAt ? ' · ' + fmtTime(c.updatedAt) : '');
+    m.append(dot, lbl); b.append(t, m);
+    b.addEventListener('click', () => selectChat(c.id));
+    li.append(b); return li;
+  }));
+}
+
+function renderThread(snap){
+  const box = $('#thread');
+  if (!snap || snap.empty){
+    box.innerHTML = '<div class="empty">Задай вопрос внизу и нажми «Отправить», потом напиши Claude в чат «го». Ответы моделей с пометкой «дословно» и разборы Claude появятся здесь.</div>';
     return;
   }
   box.replaceChildren(...snap.docs.map(doc => {
     const d = doc.data() || {};
-    const art = document.createElement('article'); art.className = 'ans';
-    const head = document.createElement('div'); head.className = 'ans-head';
-    const src = document.createElement('span'); src.className = 'ans-src'; src.textContent = d.source || 'Claude';
-    const badge = document.createElement('span');
-    badge.className = 'badge' + (d.kind === 'verbatim' ? '' : ' mine');
-    badge.textContent = d.kind === 'verbatim' ? 'дословно' : 'разбор Claude';
+    const el = document.createElement('article');
+    const isUser = d.role === 'user';
+    el.className = 'msg ' + (isUser ? 'user' : 'bot');
+    const head = document.createElement('div'); head.className = 'm-head';
+    const src = document.createElement('span'); src.className = 'm-src';
+    src.textContent = isUser ? 'Ты' : (d.source || 'Claude');
+    head.append(src);
+    if (!isUser){
+      const badge = document.createElement('span');
+      badge.className = 'badge' + (d.kind === 'verbatim' ? '' : ' mine');
+      badge.textContent = d.kind === 'verbatim' ? 'дословно' : 'разбор Claude';
+      head.append(badge);
+    }
     const meta = document.createElement('span'); meta.className = 'meta';
     meta.textContent = [typeof d.cost === 'number' ? '$' + d.cost.toFixed(2) : '', fmtTime(d.createdAt)].filter(Boolean).join(' · ');
-    head.append(src, badge, meta);
-    art.append(head);
-    if (d.question){ const q = document.createElement('p'); q.className = 'ans-q'; q.textContent = 'Вопрос: ' + d.question; art.append(q); }
-    const body = document.createElement('p'); body.className = 'ans-body'; body.textContent = d.text || '';
-    art.append(body);
-    return art;
+    head.append(meta);
+    const body = document.createElement('p'); body.className = 'm-body'; body.textContent = d.text || '';
+    el.append(head, body);
+    return el;
   }));
 }
 
+function showChat(c){
+  $('#title').value = c ? (c.title || 'Новая беседа') : 'Новая беседа';
+  setStatus(c && c.status);
+  $('#del').hidden = !c;
+  disarmDelete();
+  fillSettings(c || {});
+}
+
+function selectChat(id){
+  if (id === activeId && unsubMsgs) return;
+  activeId = id; store.set(id || '');
+  if (unsubMsgs){ unsubMsgs(); unsubMsgs = null; }
+  const c = chats.find(x => x.id === id);
+  showChat(c);
+  renderChats();
+  renderThread(null);
+  say('');
+  if (db && id){
+    unsubMsgs = db.collection('chats/' + id + '/messages').orderBy('createdAt', 'asc').limit(300)
+      .onSnapshot(renderThread, () => say('Не удалось загрузить сообщения. Обнови страницу.', true));
+  }
+}
+
+async function createChat(title){
+  const ref = db.collection('chats').doc();
+  const now = new Date().toISOString();
+  const data = { ...readSettings(), title: title || 'Новая беседа', status: null, createdAt: now, updatedAt: now };
+  await ref.set(data);
+  chats = [{ id: ref.id, ...data }, ...chats.filter(c => c.id !== ref.id)];
+  return ref.id;
+}
+
+function scheduleSave(){
+  refreshLabels();
+  if (!db || !activeId) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try { await db.doc('chats/' + activeId).update(readSettings()); } catch {}
+  }, 700);
+}
+
+function disarmDelete(){ const b = $('#del'); b.classList.remove('armed'); b.textContent = 'Удалить'; }
+
 (async () => {
-  const db = window.claude ? await window.claude.use('db') : null;
+  refreshLabels();
+  form.addEventListener('change', scheduleSave);
+  $('#budget').addEventListener('input', refreshLabels);
+  $('#notes').addEventListener('input', scheduleSave);
+
+  db = window.claude ? await window.claude.use('db') : null;
   if (!db){
-    $('#send').disabled = true;
+    $('#send').disabled = true; $('#new-chat').disabled = true;
     say('Пульт не подключён к хранилищу. Открой страницу на claude.ai под своим аккаунтом.', true);
     return;
   }
-  const ref = db.doc('panel/settings');
-  let filled = false;
-  ref.onSnapshot(snap => {
-    const d = snap.exists ? snap.data() : null;
-    if (!filled){ if (d) fillForm(d); filled = true; }
-    setStatus(d && d.status);
+
+  let first = true;
+  db.collection('chats').orderBy('updatedAt', 'desc').limit(100).onSnapshot(snap => {
+    chats = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+    if (first){
+      first = false;
+      const saved = store.get();
+      const pick = chats.find(c => c.id === saved) || chats[0];
+      selectChat(pick ? pick.id : null);
+      return;
+    }
+    if (activeId && !chats.find(c => c.id === activeId)) { selectChat(chats[0] ? chats[0].id : null); return; }
+    const cur = chats.find(c => c.id === activeId);
+    setStatus(cur && cur.status);
+    if (cur && document.activeElement !== $('#title')) $('#title').value = cur.title || 'Новая беседа';
+    renderChats();
   }, () => say('Связь с хранилищем прервалась. Обнови страницу.', true));
 
-  db.collection('answers').orderBy('createdAt', 'desc').limit(50)
-    .onSnapshot(renderAnswers, () => say('Не удалось загрузить ответы. Обнови страницу.', true));
+  $('#new-chat').addEventListener('click', async () => {
+    try { const id = await createChat(); selectChat(id); $('#question').focus(); }
+    catch { say('Не получилось создать беседу. Попробуй ещё раз.', true); }
+  });
+
+  $('#title').addEventListener('change', async () => {
+    const t = $('#title').value.trim() || 'Новая беседа';
+    if (!activeId) return;
+    try { await db.doc('chats/' + activeId).update({ title: t }); } catch { say('Не получилось переименовать.', true); }
+  });
+  $('#title').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+
+  $('#del').addEventListener('click', async () => {
+    const b = $('#del');
+    if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Точно удалить?'; setTimeout(disarmDelete, 4000); return; }
+    const id = activeId; if (!id) return;
+    b.disabled = true;
+    try {
+      const msgs = await db.collection('chats/' + id + '/messages').limit(1000).get();
+      for (const m of msgs.docs) await db.doc('chats/' + id + '/messages/' + m.id).delete();
+      await db.doc('chats/' + id).delete();
+      say('Беседа удалена.');
+    } catch { say('Не получилось удалить беседу.', true); }
+    finally { b.disabled = false; disarmDelete(); }
+  });
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    const data = readForm();
-    if (!data.question){ say('Напиши вопрос, прежде чем отправлять.', true); $('#question').focus(); return; }
-    if (!data.models.length){ say('Выбери хотя бы одну модель.', true); return; }
+    const q = $('#question').value.trim();
+    const s = readSettings();
+    if (!q){ say('Напиши вопрос, прежде чем отправлять.', true); $('#question').focus(); return; }
+    if (!s.models.length){ say('Выбери хотя бы одну модель.', true); $('#settings-box').open = true; return; }
     $('#send').disabled = true; say('Отправляю…');
     try {
-      await ref.set({ ...data, status: 'sent', sentAt: new Date().toISOString() });
+      let id = activeId;
+      const autoTitle = q.length > 48 ? q.slice(0, 46).trim() + '…' : q;
+      if (!id){ id = await createChat(autoTitle); selectChat(id); }
+      const now = new Date().toISOString();
+      await db.collection('chats/' + id + '/messages').doc().set({ role:'user', text:q, createdAt:now });
+      const cur = chats.find(c => c.id === id);
+      const patch = { ...s, status:'sent', sentAt:now, updatedAt:now };
+      if (!cur || !cur.title || cur.title === 'Новая беседа') patch.title = autoTitle;
+      await db.doc('chats/' + id).update(patch);
+      $('#question').value = '';
       say('Отправлено. Теперь напиши в чат «го».');
-    } catch (err) {
-      say(err && err.code === 'invalid_argument'
-        ? 'У тебя нет прав менять этот пульт.'
-        : 'Не получилось сохранить. Попробуй ещё раз через пару секунд.', true);
+    } catch {
+      say('Не получилось отправить. Попробуй ещё раз через пару секунд.', true);
     } finally {
       $('#send').disabled = false;
     }
