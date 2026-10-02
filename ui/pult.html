@@ -3,77 +3,85 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500&display=swap">
 <style>
-/* Layout: chat switcher on top (sidebar on wide screens), thread in the middle, composer with per-chat settings below */
+/* Layout: sidebar with section switch (Беседы / Покупки) and item list; main area shows the chosen section */
 :root{
   --bg:#eceeed; --surface:#fafbfa; --ink:#1b2220; --muted:#5a6561; --line:#d3d9d6;
   --accent:#1d6b62; --accent-ink:#ffffff; --soft:#d9e9e5; --warn:#8f6210; --bad:#a3352b; --mine:#dfe7e4;
+  --price:#1b2220;
   --f-display:"Unbounded","IBM Plex Sans",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#121715; --surface:#1a201e; --ink:#e3eae7; --muted:#95a19c; --line:#2d3734;
-  --accent:#62b9ad; --accent-ink:#0d1412; --soft:#1f322e; --warn:#e2b55e; --bad:#ec8a7f; --mine:#24302d; color-scheme:dark}}
+  --accent:#62b9ad; --accent-ink:#0d1412; --soft:#1f322e; --warn:#e2b55e; --bad:#ec8a7f; --mine:#24302d;
+  --price:#e3eae7; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#121715; --surface:#1a201e; --ink:#e3eae7; --muted:#95a19c; --line:#2d3734;
-  --accent:#62b9ad; --accent-ink:#0d1412; --soft:#1f322e; --warn:#e2b55e; --bad:#ec8a7f; --mine:#24302d; color-scheme:dark}
+  --accent:#62b9ad; --accent-ink:#0d1412; --soft:#1f322e; --warn:#e2b55e; --bad:#ec8a7f; --mine:#24302d;
+  --price:#e3eae7; color-scheme:dark}
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;padding-block:20px 48px;padding-inline:16px}
-.app{max-width:1040px;margin:0 auto;display:grid;gap:16px;grid-template-columns:1fr}
+.app{max-width:1080px;margin:0 auto;display:grid;gap:16px;grid-template-columns:1fr}
 @media (min-width:860px){.app{grid-template-columns:240px minmax(0,1fr);align-items:start}}
 
-/* chat list */
+/* sidebar */
 .side{display:grid;gap:10px;min-width:0}
 @media (min-width:860px){.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}}
 .brand{font-family:var(--f-display);font-weight:500;font-size:20px;margin:0;letter-spacing:-.01em}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:9px}
+.tabs button{font:inherit;font-size:14px;font-weight:500;padding:7px 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .new{font:inherit;font-weight:600;padding:9px 14px;border-radius:8px;border:1px dashed var(--accent);background:transparent;color:var(--accent);cursor:pointer;text-align:left}
 .new:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.chats{list-style:none;margin:0;padding:0;display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
-@media (min-width:860px){.chats{flex-direction:column;overflow:visible;padding:0}}
-.chats button{font:inherit;width:100%;text-align:left;display:grid;gap:2px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-width:160px;max-width:240px}
-@media (min-width:860px){.chats button{max-width:none;min-width:0}}
-.chats button[aria-current="true"]{border-color:var(--accent);background:var(--soft)}
-.chats button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.list{list-style:none;margin:0;padding:0 0 4px;display:flex;gap:6px;overflow-x:auto}
+@media (min-width:860px){.list{flex-direction:column;overflow:visible;padding:0}}
+.list button{font:inherit;width:100%;text-align:left;display:grid;gap:2px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-width:160px;max-width:240px}
+@media (min-width:860px){.list button{max-width:none;min-width:0}}
+.list button[aria-current="true"]{border-color:var(--accent);background:var(--soft)}
+.list button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .c-title{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.c-meta{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.c-meta{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;min-width:0}
+.c-meta span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--line);flex:none}
 .dot[data-s="sent"]{background:var(--warn)}
-.dot[data-s="working"]{background:var(--accent)}
-.dot[data-s="done"]{background:var(--accent);box-shadow:0 0 0 2px var(--soft)}
+.dot[data-s="working"],.dot[data-s="done"]{background:var(--accent)}
 .side-empty{color:var(--muted);font-size:13px;margin:0}
 
-/* main */
-.main{display:grid;gap:14px;min-width:0}
+/* shared main */
+.view{display:grid;gap:14px;min-width:0}
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
-#title{flex:1;min-width:0;font:inherit;font-family:var(--f-display);font-weight:500;font-size:17px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;color:var(--ink)}
-#title:hover{border-color:var(--line)}
-#title:focus-visible{outline:none;border-color:var(--accent);background:var(--surface)}
+.title{flex:1;min-width:0;font:inherit;font-family:var(--f-display);font-weight:500;font-size:17px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;color:var(--ink)}
+.title:hover{border-color:var(--line)}
+.title:focus-visible{outline:none;border-color:var(--accent);background:var(--surface)}
 .status{font-family:var(--f-mono);font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
 .status[data-s="sent"]{border-color:var(--warn);color:var(--warn)}
 .status[data-s="working"]{border-color:var(--accent);color:var(--accent)}
 .status[data-s="done"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .del{font:inherit;font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
 .del.armed{border-color:var(--bad);color:var(--bad)}
-
-.thread{display:grid;gap:10px;min-width:0}
 .empty{border:1px dashed var(--line);border-radius:10px;padding:16px;color:var(--muted)}
+
+/* chat thread */
+.thread{display:grid;gap:10px;min-width:0}
 .msg{border-radius:10px;padding:12px 14px;display:grid;gap:6px;min-width:0}
 .msg.user{background:var(--mine);justify-self:end;max-width:min(560px,92%)}
 .msg.bot{background:var(--surface);border:1px solid var(--line)}
 .m-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}
 .m-src{font-weight:600;font-size:14px}
-.badge{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:4px;background:var(--soft);color:var(--accent)}
+.badge{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:4px;background:var(--soft);color:var(--accent);white-space:nowrap}
 .badge.mine{background:transparent;border:1px solid var(--line);color:var(--muted)}
 .meta{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 .m-body{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
 
-/* composer */
+/* forms */
 form{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px}
 textarea{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;resize:vertical}
 textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 #question{min-height:88px}
-#notes{min-height:52px}
+#notes,#s-notes{min-height:52px}
 details{border-top:1px solid var(--line);padding-top:10px}
 summary{cursor:pointer;font-size:13px;color:var(--muted);list-style:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 summary::-webkit-details-marker{display:none}
@@ -98,6 +106,7 @@ legend,.lbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spaci
 .field{display:grid;gap:4px;font-size:13px;color:var(--muted);min-width:0}
 .field input{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
 .field input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.field.wide{grid-column:1/-1}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media (max-width:560px){.row{grid-template-columns:1fr}}
 .budget{display:flex;align-items:center;gap:12px}
@@ -114,34 +123,59 @@ legend,.lbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spaci
 .send:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .note{font-size:14px;color:var(--muted)}
 .note.err{color:var(--bad)}
+
+/* shopping results */
+.verdict{background:var(--soft);border-radius:10px;padding:14px 16px;display:grid;gap:6px}
+.verdict h3{margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent)}
+.verdict p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.items{display:grid;gap:12px;grid-template-columns:1fr}
+@media (min-width:700px){.items{grid-template-columns:1fr 1fr}}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:10px;align-content:start;min-width:0}
+.item.best{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.i-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.i-name{margin:0;font-size:16px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+.i-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.i-price b{font-family:var(--f-mono);font-weight:500;font-size:22px;color:var(--price);font-variant-numeric:tabular-nums}
+.i-price span{font-size:13px;color:var(--muted)}
+.check{font-size:12px;color:var(--muted);display:inline-flex;gap:5px;align-items:center}
+.check::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--warn)}
+.check.ok::before{background:var(--accent)}
+.pc{display:grid;gap:4px;margin:0;padding:0;list-style:none;font-size:14px}
+.pc li{display:grid;grid-template-columns:14px 1fr;gap:6px}
+.pc li::before{font-family:var(--f-mono);color:var(--muted)}
+.pc.pros li::before{content:"+";color:var(--accent)}
+.pc.cons li::before{content:"−";color:var(--bad)}
+.i-note{margin:0;font-size:14px;color:var(--muted)}
+.i-link{justify-self:start;font-weight:600;color:var(--accent);text-decoration:none;border-bottom:1px solid currentColor}
+.i-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
 <div class="app">
   <aside class="side">
     <h1 class="brand">Консилиум</h1>
-    <button type="button" class="new" id="new-chat">+ Новая беседа</button>
-    <ul class="chats" id="chats" aria-label="Беседы"></ul>
-    <p class="side-empty" id="side-empty">Бесед пока нет. Создай первую или просто задай вопрос.</p>
+    <div class="tabs" role="tablist" aria-label="Раздел">
+      <button type="button" role="tab" id="tab-chats" aria-selected="true">Беседы</button>
+      <button type="button" role="tab" id="tab-shops" aria-selected="false">Покупки</button>
+    </div>
+    <button type="button" class="new" id="new-btn">+ Новая беседа</button>
+    <ul class="list" id="list" aria-label="Список"></ul>
+    <p class="side-empty" id="side-empty"></p>
   </aside>
 
-  <section class="main">
+  <!-- Беседы -->
+  <section class="view" id="chat-view">
     <div class="top">
-      <input id="title" aria-label="Название беседы" value="Новая беседа" maxlength="80">
-      <span class="status" id="status" data-s="none">Не отправлено</span>
-      <button type="button" class="del" id="del" hidden>Удалить</button>
+      <input class="title" id="chat-title" aria-label="Название беседы" value="Новая беседа" maxlength="80">
+      <span class="status" id="chat-status" data-s="none">Не отправлено</span>
+      <button type="button" class="del" id="chat-del" hidden>Удалить</button>
     </div>
-
-    <div class="thread" id="thread" aria-live="polite">
-      <div class="empty">Задай вопрос внизу и нажми «Отправить», потом напиши Claude в чат «го». Ответы моделей с пометкой «дословно» и разборы Claude появятся здесь.</div>
-    </div>
-
+    <div class="thread" id="thread" aria-live="polite"></div>
     <form id="composer" novalidate>
       <div>
         <label class="lbl" for="question">Вопрос</label>
         <textarea id="question" name="question" placeholder="Например: какие аргументы за и против того, что Китай станет главной державой к 2050 году?"></textarea>
       </div>
-
       <details id="settings-box">
         <summary>Настройки беседы: <b id="summary-text"></b></summary>
         <div class="settings">
@@ -152,25 +186,8 @@ legend,.lbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spaci
               <label class="chip"><input type="radio" name="mode" id="mode-deep" value="deep" checked><span>Глубоко</span></label>
               <label class="chip"><input type="radio" name="mode" id="mode-debate" value="debate"><span>Дебаты</span></label>
               <label class="chip"><input type="radio" name="mode" id="mode-psy" value="psy"><span>Психолог</span></label>
-              <label class="chip"><input type="radio" name="mode" id="mode-shop" value="shop"><span>Покупки</span></label>
             </div>
             <p class="hint" id="mode-hint"></p>
-          </fieldset>
-          <fieldset id="shop-fields" hidden>
-            <legend>Что покупаем</legend>
-            <div class="fields">
-              <label class="field"><span>Что ищем</span><input id="f-item" name="item" placeholder="Беговые кроссовки для асфальта"></label>
-              <label class="field"><span>Бюджет до, ₽</span><input id="f-max" name="maxPrice" type="number" min="0" step="500" inputmode="numeric" placeholder="12000"></label>
-              <label class="field"><span>Размер</span><input id="f-size" name="size" placeholder="43 EU"></label>
-              <label class="field"><span>Для чего и что важно</span><input id="f-purpose" name="purpose" placeholder="Бег 3 раза в неделю, широкая стопа"></label>
-            </div>
-            <span class="lbl">Где искать</span>
-            <div class="chips">
-              <label class="chip"><input type="checkbox" name="markets" id="mk-ozon" value="ozon" checked><span>Ozon</span></label>
-              <label class="chip"><input type="checkbox" name="markets" id="mk-wb" value="wb"><span>Wildberries</span></label>
-              <label class="chip"><input type="checkbox" name="markets" id="mk-ym" value="ym"><span>Яндекс Маркет</span></label>
-              <label class="chip"><input type="checkbox" name="markets" id="mk-any" value="any"><span>Любые магазины</span></label>
-            </div>
           </fieldset>
           <fieldset>
             <legend>Модели</legend>
@@ -216,256 +233,349 @@ legend,.lbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spaci
           </div>
         </div>
       </details>
-
       <div class="actions">
-        <button type="submit" class="send" id="send">Отправить</button>
-        <span class="note" id="note" role="status"></span>
+        <button type="submit" class="send" id="chat-send">Отправить</button>
+        <span class="note" id="chat-note" role="status"></span>
       </div>
     </form>
+  </section>
+
+  <!-- Покупки -->
+  <section class="view" id="shop-view" hidden>
+    <div class="top">
+      <input class="title" id="shop-title" aria-label="Название поиска" value="Новый поиск" maxlength="80">
+      <span class="status" id="shop-status" data-s="none">Не отправлено</span>
+      <button type="button" class="del" id="shop-del" hidden>Удалить</button>
+    </div>
+    <form id="shop-form" novalidate>
+      <div class="fields">
+        <label class="field wide"><span>Что ищем</span><input id="s-item" name="item" placeholder="Беговые кроссовки для асфальта"></label>
+        <label class="field"><span>Бюджет до, ₽</span><input id="s-max" name="maxPrice" type="number" min="0" step="500" inputmode="numeric" placeholder="12000"></label>
+        <label class="field"><span>Размер</span><input id="s-size" name="size" placeholder="43 EU"></label>
+        <label class="field wide"><span>Для чего и что важно</span><input id="s-purpose" name="purpose" placeholder="Бег 3 раза в неделю по 5–10 км, широкая стопа"></label>
+      </div>
+      <div>
+        <span class="lbl">Где искать</span>
+        <div class="chips">
+          <label class="chip"><input type="checkbox" name="markets" id="mk-ozon" value="ozon" checked><span>Ozon</span></label>
+          <label class="chip"><input type="checkbox" name="markets" id="mk-wb" value="wb"><span>Wildberries</span></label>
+          <label class="chip"><input type="checkbox" name="markets" id="mk-ym" value="ym"><span>Яндекс Маркет</span></label>
+          <label class="chip"><input type="checkbox" name="markets" id="mk-any" value="any"><span>Любые магазины</span></label>
+        </div>
+      </div>
+      <div>
+        <label class="lbl" for="s-notes">Пометки для Claude</label>
+        <textarea id="s-notes" name="notes" placeholder="Любимые бренды, что не подходит, что уже пробовал"></textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" class="send" id="shop-send">Искать</button>
+        <span class="note" id="shop-note" role="status"></span>
+      </div>
+    </form>
+    <div class="verdict" id="shop-verdict" hidden>
+      <h3>Вывод Claude</h3>
+      <p id="shop-summary"></p>
+    </div>
+    <div class="items" id="items"></div>
   </section>
 </div>
 
 <script>
 const $ = s => document.querySelector(s);
-const form = $('#composer');
-const MODE_NAME = { plain:'Обычный', deep:'Глубоко', debate:'Дебаты', psy:'Психолог', shop:'Покупки' };
+const chatForm = $('#composer'), shopForm = $('#shop-form');
+const MODE_NAME = { plain:'Обычный', deep:'Глубоко', debate:'Дебаты', psy:'Психолог' };
 const DEPTH_NAME = { low:'быстро', medium:'средне', high:'глубоко', max:'максимум' };
 const MODE_HINT = {
   plain: 'Один ответ Claude, как в обычном чате, но с твоими настройками.',
   deep: 'Несколько независимых черновиков, критик ищет ошибки, затем итоговый ответ.',
   debate: 'Две модели отвечают и спорят, судья разбирает, кто где прав.',
-  psy: 'Разговор по методике психолога: вопросы, гипотезы, без поддакивания.',
-  shop: 'Ищу лучшее за твои деньги: обзоры и тесты, цены и наличие на маркетплейсах, разбор отзывов, итоговая таблица.'
+  psy: 'Разговор по методике психолога: вопросы, гипотезы, без поддакивания.'
 };
 const STATUS = { sent:'Отправлено, напиши в чат «го»', working:'Claude работает…', done:'Готово' };
-const DEFAULTS = { mode:'deep', models:['claude','kimi-k3'], depth:'high', budget:2,
-  options:{ verbatim:true, critic:true, web:false, argue:false }, notes:'',
-  shop:{ item:'', maxPrice:null, size:'', purpose:'', markets:['ozon'] } };
+const VERDICT = { best:['Лучший выбор',0], cheaper:['Дешевле',1], alt:['Альтернатива',2] };
+const CHAT_DEFAULTS = { mode:'deep', models:['claude','kimi-k3'], depth:'high', budget:2,
+  options:{ verbatim:true, critic:true, web:false, argue:false }, notes:'' };
+const SHOP_DEFAULTS = { item:'', maxPrice:null, size:'', purpose:'', markets:['ozon'], notes:'' };
+const CHAT_EMPTY = 'Задай вопрос внизу и нажми «Отправить», потом напиши Claude в чат «го». Ответы моделей с пометкой «дословно» и разборы Claude появятся здесь.';
+const SHOP_EMPTY = 'Опиши, что ищешь, и нажми «Искать», потом напиши Claude в чат «го». Здесь появятся карточки товаров: цена, где купить, плюсы и минусы, ссылка в магазин.';
 
-let db = null, chats = [], activeId = null, unsubMsgs = null, saveTimer = null;
-const store = {
-  get(){ try { return localStorage.getItem('konsilium.active'); } catch { return null; } },
-  set(v){ try { localStorage.setItem('konsilium.active', v); } catch {} }
+const local = {
+  get(k){ try { return localStorage.getItem('konsilium.' + k); } catch { return null; } },
+  set(k, v){ try { localStorage.setItem('konsilium.' + k, v || ''); } catch {} }
+};
+let db = null;
+let section = location.hash === '#shop' ? 'shops' : (local.get('section') === 'shops' ? 'shops' : 'chats');
+const S = {
+  chats: { items: [], active: null, unsub: null, timer: null, ready: false },
+  shops: { items: [], active: null, unsub: null, timer: null, ready: false }
 };
 
-function readSettings(){
-  const fd = new FormData(form);
-  return {
-    mode: fd.get('mode'), models: fd.getAll('models'), depth: fd.get('depth'),
-    budget: Number(fd.get('budget')),
+/* helpers */
+const fmtTime = iso => { try { return new Date(iso).toLocaleString('ru-RU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); } catch { return ''; } };
+const rub = n => Number(n).toLocaleString('ru-RU') + ' ₽';
+const autoTitle = t => t.length > 48 ? t.slice(0, 46).trim() + '…' : t;
+function note(which, text, err){ const n = $('#' + which + '-note'); n.textContent = text; n.classList.toggle('err', !!err); }
+function setStatus(which, s){ const el = $('#' + which + '-status'); el.dataset.s = s || 'none'; el.textContent = STATUS[s] || 'Не отправлено'; }
+function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+/* chat settings */
+function readChat(){
+  const fd = new FormData(chatForm);
+  return { mode: fd.get('mode'), models: fd.getAll('models'), depth: fd.get('depth'), budget: Number(fd.get('budget')),
     options: { verbatim: fd.has('verbatim'), critic: fd.has('critic'), web: fd.has('web'), argue: fd.has('argue') },
-    notes: String(fd.get('notes') || '').trim(),
-    shop: {
-      item: String(fd.get('item') || '').trim(),
-      maxPrice: fd.get('maxPrice') ? Number(fd.get('maxPrice')) : null,
-      size: String(fd.get('size') || '').trim(),
-      purpose: String(fd.get('purpose') || '').trim(),
-      markets: fd.getAll('markets')
-    }
-  };
+    notes: String(fd.get('notes') || '').trim() };
 }
-function fillSettings(d){
-  d = { ...DEFAULTS, ...d, options: { ...DEFAULTS.options, ...(d && d.options) }, shop: { ...DEFAULTS.shop, ...(d && d.shop) } };
-  form.querySelectorAll('input[name=mode]').forEach(i => i.checked = i.value === d.mode);
-  form.querySelectorAll('input[name=models]').forEach(i => i.checked = d.models.includes(i.value));
-  form.querySelectorAll('input[name=depth]').forEach(i => i.checked = i.value === d.depth);
+function fillChat(d){
+  d = { ...CHAT_DEFAULTS, ...d, options: { ...CHAT_DEFAULTS.options, ...(d && d.options) } };
+  chatForm.querySelectorAll('input[name=mode]').forEach(i => i.checked = i.value === d.mode);
+  chatForm.querySelectorAll('input[name=models]').forEach(i => i.checked = (d.models || []).includes(i.value));
+  chatForm.querySelectorAll('input[name=depth]').forEach(i => i.checked = i.value === d.depth);
   $('#budget').value = d.budget;
   ['verbatim','critic','web','argue'].forEach(k => $('#o-' + k).checked = !!d.options[k]);
   $('#notes').value = d.notes || '';
-  $('#f-item').value = d.shop.item || '';
-  $('#f-max').value = d.shop.maxPrice ?? '';
-  $('#f-size').value = d.shop.size || '';
-  $('#f-purpose').value = d.shop.purpose || '';
-  form.querySelectorAll('input[name=markets]').forEach(i => i.checked = (d.shop.markets || []).includes(i.value));
-  refreshLabels();
+  chatLabels();
 }
-function refreshLabels(){
-  const s = readSettings();
+function chatLabels(){
+  const s = readChat();
   $('#mode-hint').textContent = MODE_HINT[s.mode] || '';
   $('#budget-out').textContent = '$' + s.budget.toFixed(1);
-  const isShop = s.mode === 'shop';
-  $('#shop-fields').hidden = !isShop;
-  const parts = [MODE_NAME[s.mode], DEPTH_NAME[s.depth], s.models.length + ' мод.'];
-  if (isShop && s.shop.maxPrice) parts.push('до ' + s.shop.maxPrice.toLocaleString('ru-RU') + ' ₽');
-  $('#summary-text').textContent = parts.join(' · ');
-}
-function say(text, err){ const n = $('#note'); n.textContent = text; n.classList.toggle('err', !!err); }
-function setStatus(s){ const el = $('#status'); el.dataset.s = s || 'none'; el.textContent = STATUS[s] || 'Не отправлено'; }
-function fmtTime(iso){
-  try { return new Date(iso).toLocaleString('ru-RU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); }
-  catch { return ''; }
+  $('#summary-text').textContent = [MODE_NAME[s.mode], DEPTH_NAME[s.depth], s.models.length + ' мод.'].join(' · ');
 }
 
-function renderChats(){
-  const ul = $('#chats');
-  $('#side-empty').hidden = chats.length > 0;
-  ul.replaceChildren(...chats.map(c => {
-    const li = document.createElement('li');
-    const b = document.createElement('button'); b.type = 'button';
-    b.setAttribute('aria-current', c.id === activeId ? 'true' : 'false');
-    const t = document.createElement('span'); t.className = 'c-title'; t.textContent = c.title || 'Новая беседа';
-    const m = document.createElement('span'); m.className = 'c-meta';
-    const dot = document.createElement('span'); dot.className = 'dot'; dot.dataset.s = c.status || 'none';
-    const lbl = document.createElement('span'); lbl.textContent = (MODE_NAME[c.mode] || '') + (c.updatedAt ? ' · ' + fmtTime(c.updatedAt) : '');
-    m.append(dot, lbl); b.append(t, m);
-    b.addEventListener('click', () => selectChat(c.id));
+/* shop settings */
+function readShop(){
+  const fd = new FormData(shopForm);
+  return { item: String(fd.get('item') || '').trim(), maxPrice: fd.get('maxPrice') ? Number(fd.get('maxPrice')) : null,
+    size: String(fd.get('size') || '').trim(), purpose: String(fd.get('purpose') || '').trim(),
+    markets: fd.getAll('markets'), notes: String(fd.get('notes') || '').trim() };
+}
+function fillShop(d){
+  d = { ...SHOP_DEFAULTS, ...d };
+  $('#s-item').value = d.item || ''; $('#s-max').value = d.maxPrice ?? '';
+  $('#s-size').value = d.size || ''; $('#s-purpose').value = d.purpose || '';
+  $('#s-notes').value = d.notes || '';
+  shopForm.querySelectorAll('input[name=markets]').forEach(i => i.checked = (d.markets || []).includes(i.value));
+}
+
+/* sidebar */
+function renderList(){
+  const st = S[section];
+  $('#tab-chats').setAttribute('aria-selected', section === 'chats');
+  $('#tab-shops').setAttribute('aria-selected', section === 'shops');
+  $('#new-btn').textContent = section === 'chats' ? '+ Новая беседа' : '+ Новый поиск';
+  $('#side-empty').textContent = section === 'chats' ? 'Бесед пока нет. Создай первую или просто задай вопрос.' : 'Поисков пока нет. Создай первый или просто заполни форму.';
+  $('#side-empty').hidden = st.items.length > 0;
+  $('#list').replaceChildren(...st.items.map(c => {
+    const li = el('li'); const b = el('button'); b.type = 'button';
+    b.setAttribute('aria-current', c.id === st.active ? 'true' : 'false');
+    const m = el('span', 'c-meta'); const dot = el('span', 'dot'); dot.dataset.s = c.status || 'none';
+    const sub = section === 'chats' ? (MODE_NAME[c.mode] || '') : (c.maxPrice ? 'до ' + rub(c.maxPrice) : 'без бюджета');
+    m.append(dot, el('span', '', sub + (c.updatedAt ? ' · ' + fmtTime(c.updatedAt) : '')));
+    b.append(el('span', 'c-title', c.title || (section === 'chats' ? 'Новая беседа' : 'Новый поиск')), m);
+    b.addEventListener('click', () => select(section, c.id));
     li.append(b); return li;
   }));
 }
+function showSection(sec){
+  section = sec; local.set('section', sec);
+  $('#chat-view').hidden = sec !== 'chats';
+  $('#shop-view').hidden = sec !== 'shops';
+  renderList();
+}
 
+/* threads and items */
 function renderThread(snap){
   const box = $('#thread');
-  if (!snap || snap.empty){
-    box.innerHTML = '<div class="empty">Задай вопрос внизу и нажми «Отправить», потом напиши Claude в чат «го». Ответы моделей с пометкой «дословно» и разборы Claude появятся здесь.</div>';
-    return;
-  }
+  if (!snap || snap.empty){ box.replaceChildren(el('div', 'empty', CHAT_EMPTY)); return; }
   box.replaceChildren(...snap.docs.map(doc => {
-    const d = doc.data() || {};
-    const el = document.createElement('article');
-    const isUser = d.role === 'user';
-    el.className = 'msg ' + (isUser ? 'user' : 'bot');
-    const head = document.createElement('div'); head.className = 'm-head';
-    const src = document.createElement('span'); src.className = 'm-src';
-    src.textContent = isUser ? 'Ты' : (d.source || 'Claude');
-    head.append(src);
-    if (!isUser){
-      const badge = document.createElement('span');
-      badge.className = 'badge' + (d.kind === 'verbatim' ? '' : ' mine');
-      badge.textContent = d.kind === 'verbatim' ? 'дословно' : 'разбор Claude';
-      head.append(badge);
+    const d = doc.data() || {}; const isUser = d.role === 'user';
+    const art = el('article', 'msg ' + (isUser ? 'user' : 'bot'));
+    const head = el('div', 'm-head');
+    head.append(el('span', 'm-src', isUser ? 'Ты' : (d.source || 'Claude')));
+    if (!isUser) head.append(el('span', 'badge' + (d.kind === 'verbatim' ? '' : ' mine'), d.kind === 'verbatim' ? 'дословно' : 'разбор Claude'));
+    head.append(el('span', 'meta', [typeof d.cost === 'number' ? '$' + d.cost.toFixed(2) : '', fmtTime(d.createdAt)].filter(Boolean).join(' · ')));
+    art.append(head, el('p', 'm-body', d.text || ''));
+    return art;
+  }));
+}
+function renderItems(snap){
+  const box = $('#items');
+  if (!snap || snap.empty){ box.replaceChildren(el('div', 'empty', SHOP_EMPTY)); return; }
+  const docs = snap.docs.map(d => d.data() || {}).sort((a, b) =>
+    ((VERDICT[a.verdict] || [0,9])[1] - (VERDICT[b.verdict] || [0,9])[1]) || ((a.price || 1e12) - (b.price || 1e12)));
+  box.replaceChildren(...docs.map(d => {
+    const card = el('article', 'item' + (d.verdict === 'best' ? ' best' : ''));
+    const head = el('div', 'i-head');
+    if (VERDICT[d.verdict]) head.append(el('span', 'badge', VERDICT[d.verdict][0]));
+    head.append(el('span', 'check' + (d.checked ? ' ok' : ''), d.checked ? 'цена проверена в магазине' : 'по обзорам, не проверено'));
+    const price = el('div', 'i-price');
+    price.append(el('b', '', typeof d.price === 'number' ? rub(d.price) : 'цена ?'), el('span', '', [d.store, d.rating ? '★ ' + d.rating : ''].filter(Boolean).join(' · ')));
+    card.append(head, el('h4', 'i-name', d.name || 'Без названия'), price);
+    const list = (arr, cls) => { const ul = el('ul', 'pc ' + cls); (arr || []).forEach(t => ul.append(el('li', '', t))); return ul; };
+    if (d.pros && d.pros.length) card.append(list(d.pros, 'pros'));
+    if (d.cons && d.cons.length) card.append(list(d.cons, 'cons'));
+    if (d.note) card.append(el('p', 'i-note', d.note));
+    if (typeof d.url === 'string' && /^https:\/\//.test(d.url)){
+      const a = el('a', 'i-link', 'Открыть в магазине'); a.href = d.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; card.append(a);
     }
-    const meta = document.createElement('span'); meta.className = 'meta';
-    meta.textContent = [typeof d.cost === 'number' ? '$' + d.cost.toFixed(2) : '', fmtTime(d.createdAt)].filter(Boolean).join(' · ');
-    head.append(meta);
-    const body = document.createElement('p'); body.className = 'm-body'; body.textContent = d.text || '';
-    el.append(head, body);
-    return el;
+    return card;
   }));
 }
 
-function showChat(c){
-  $('#title').value = c ? (c.title || 'Новая беседа') : 'Новая беседа';
-  setStatus(c && c.status);
-  $('#del').hidden = !c;
-  disarmDelete();
-  fillSettings(c || {});
-}
-
-function selectChat(id){
-  if (id === activeId && unsubMsgs) return;
-  activeId = id; store.set(id || '');
-  if (unsubMsgs){ unsubMsgs(); unsubMsgs = null; }
-  const c = chats.find(x => x.id === id);
-  showChat(c);
-  renderChats();
-  renderThread(null);
-  say('');
-  if (db && id){
-    unsubMsgs = db.collection('chats/' + id + '/messages').orderBy('createdAt', 'asc').limit(300)
-      .onSnapshot(renderThread, () => say('Не удалось загрузить сообщения. Обнови страницу.', true));
+function showCurrent(sec){
+  const st = S[sec]; const c = st.items.find(x => x.id === st.active);
+  if (sec === 'chats'){
+    $('#chat-title').value = c ? (c.title || 'Новая беседа') : 'Новая беседа';
+    setStatus('chat', c && c.status); $('#chat-del').hidden = !c; disarm('chat'); fillChat(c || {});
+  } else {
+    $('#shop-title').value = c ? (c.title || 'Новый поиск') : 'Новый поиск';
+    setStatus('shop', c && c.status); $('#shop-del').hidden = !c; disarm('shop'); fillShop(c || {});
+    $('#shop-summary').textContent = (c && c.summary) || ''; $('#shop-verdict').hidden = !(c && c.summary);
   }
 }
 
-async function createChat(title){
-  const ref = db.collection('chats').doc();
-  const now = new Date().toISOString();
-  const data = { ...readSettings(), title: title || 'Новая беседа', status: null, createdAt: now, updatedAt: now };
+function select(sec, id){
+  const st = S[sec];
+  if (id === st.active && st.unsub) return;
+  st.active = id; local.set(sec + '.active', id);
+  if (st.unsub){ st.unsub(); st.unsub = null; }
+  showCurrent(sec);
+  if (sec === section) renderList();
+  if (sec === 'chats'){ renderThread(null); note('chat', ''); } else { renderItems(null); note('shop', ''); }
+  if (db && id){
+    const path = sec === 'chats' ? 'chats/' + id + '/messages' : 'shops/' + id + '/items';
+    const q = sec === 'chats' ? db.collection(path).orderBy('createdAt', 'asc').limit(300) : db.collection(path).limit(100);
+    st.unsub = q.onSnapshot(sec === 'chats' ? renderThread : renderItems,
+      () => note(sec === 'chats' ? 'chat' : 'shop', 'Не удалось загрузить. Обнови страницу.', true));
+  }
+}
+
+async function create(sec, title){
+  const ref = db.collection(sec).doc(); const now = new Date().toISOString();
+  const base = sec === 'chats' ? readChat() : readShop();
+  const data = { ...base, title: title || (sec === 'chats' ? 'Новая беседа' : 'Новый поиск'), status: null, createdAt: now, updatedAt: now };
   await ref.set(data);
-  chats = [{ id: ref.id, ...data }, ...chats.filter(c => c.id !== ref.id)];
+  S[sec].items = [{ id: ref.id, ...data }, ...S[sec].items.filter(c => c.id !== ref.id)];
   return ref.id;
 }
-
-function scheduleSave(){
-  refreshLabels();
-  if (!db || !activeId) return;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    try { await db.doc('chats/' + activeId).update(readSettings()); } catch {}
+function scheduleSave(sec){
+  const st = S[sec];
+  if (!db || !st.active) return;
+  clearTimeout(st.timer);
+  st.timer = setTimeout(async () => {
+    try { await db.doc(sec + '/' + st.active).update(sec === 'chats' ? readChat() : readShop()); } catch {}
   }, 700);
 }
+function disarm(which){ const b = $('#' + which + '-del'); b.classList.remove('armed'); b.textContent = 'Удалить'; }
+async function removeCurrent(sec){
+  const which = sec === 'chats' ? 'chat' : 'shop'; const b = $('#' + which + '-del');
+  if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Точно удалить?'; setTimeout(() => disarm(which), 4000); return; }
+  const id = S[sec].active; if (!id) return;
+  b.disabled = true;
+  try {
+    const sub = sec === 'chats' ? 'messages' : 'items';
+    const docs = await db.collection(sec + '/' + id + '/' + sub).limit(1000).get();
+    for (const m of docs.docs) await db.doc(sec + '/' + id + '/' + sub + '/' + m.id).delete();
+    await db.doc(sec + '/' + id).delete();
+    note(which, 'Удалено.');
+  } catch { note(which, 'Не получилось удалить.', true); }
+  finally { b.disabled = false; disarm(which); }
+}
 
-function disarmDelete(){ const b = $('#del'); b.classList.remove('armed'); b.textContent = 'Удалить'; }
-
+/* boot */
 (async () => {
-  refreshLabels();
-  form.addEventListener('change', scheduleSave);
-  $('#budget').addEventListener('input', refreshLabels);
-  $('#notes').addEventListener('input', scheduleSave);
+  chatLabels(); fillShop({}); renderThread(null); renderItems(null); showSection(section);
+  chatForm.addEventListener('change', () => { chatLabels(); scheduleSave('chats'); });
+  $('#budget').addEventListener('input', chatLabels);
+  shopForm.addEventListener('change', () => scheduleSave('shops'));
+  $('#tab-chats').addEventListener('click', () => showSection('chats'));
+  $('#tab-shops').addEventListener('click', () => showSection('shops'));
 
   db = window.claude ? await window.claude.use('db') : null;
   if (!db){
-    $('#send').disabled = true; $('#new-chat').disabled = true;
-    say('Пульт не подключён к хранилищу. Открой страницу на claude.ai под своим аккаунтом.', true);
+    ['chat-send','shop-send','new-btn'].forEach(id => $('#' + id).disabled = true);
+    note(section === 'chats' ? 'chat' : 'shop', 'Пульт не подключён к хранилищу. Открой страницу на claude.ai под своим аккаунтом.', true);
     return;
   }
 
-  let first = true;
-  db.collection('chats').orderBy('updatedAt', 'desc').limit(100).onSnapshot(snap => {
-    chats = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
-    if (first){
-      first = false;
-      const saved = store.get();
-      const pick = chats.find(c => c.id === saved) || chats[0];
-      selectChat(pick ? pick.id : null);
-      return;
-    }
-    if (activeId && !chats.find(c => c.id === activeId)) { selectChat(chats[0] ? chats[0].id : null); return; }
-    const cur = chats.find(c => c.id === activeId);
-    setStatus(cur && cur.status);
-    if (cur && document.activeElement !== $('#title')) $('#title').value = cur.title || 'Новая беседа';
-    renderChats();
-  }, () => say('Связь с хранилищем прервалась. Обнови страницу.', true));
-
-  $('#new-chat').addEventListener('click', async () => {
-    try { const id = await createChat(); selectChat(id); $('#question').focus(); }
-    catch { say('Не получилось создать беседу. Попробуй ещё раз.', true); }
+  ['chats','shops'].forEach(sec => {
+    db.collection(sec).orderBy('updatedAt', 'desc').limit(100).onSnapshot(snap => {
+      const st = S[sec];
+      st.items = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+      if (!st.ready){
+        st.ready = true;
+        const saved = local.get(sec + '.active');
+        const pick = st.items.find(c => c.id === saved) || st.items[0];
+        select(sec, pick ? pick.id : null);
+        if (sec === section) renderList();
+        return;
+      }
+      if (st.active && !st.items.find(c => c.id === st.active)){ select(sec, st.items[0] ? st.items[0].id : null); return; }
+      const cur = st.items.find(c => c.id === st.active);
+      const which = sec === 'chats' ? 'chat' : 'shop';
+      setStatus(which, cur && cur.status);
+      if (cur && document.activeElement !== $('#' + which + '-title')) $('#' + which + '-title').value = cur.title || '';
+      if (sec === 'shops'){ $('#shop-summary').textContent = (cur && cur.summary) || ''; $('#shop-verdict').hidden = !(cur && cur.summary); }
+      if (sec === section) renderList();
+    }, () => note(sec === 'chats' ? 'chat' : 'shop', 'Связь с хранилищем прервалась. Обнови страницу.', true));
   });
 
-  $('#title').addEventListener('change', async () => {
-    const t = $('#title').value.trim() || 'Новая беседа';
-    if (!activeId) return;
-    try { await db.doc('chats/' + activeId).update({ title: t }); } catch { say('Не получилось переименовать.', true); }
-  });
-  $('#title').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
-
-  $('#del').addEventListener('click', async () => {
-    const b = $('#del');
-    if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Точно удалить?'; setTimeout(disarmDelete, 4000); return; }
-    const id = activeId; if (!id) return;
-    b.disabled = true;
-    try {
-      const msgs = await db.collection('chats/' + id + '/messages').limit(1000).get();
-      for (const m of msgs.docs) await db.doc('chats/' + id + '/messages/' + m.id).delete();
-      await db.doc('chats/' + id).delete();
-      say('Беседа удалена.');
-    } catch { say('Не получилось удалить беседу.', true); }
-    finally { b.disabled = false; disarmDelete(); }
+  $('#new-btn').addEventListener('click', async () => {
+    const sec = section;
+    try { const id = await create(sec); select(sec, id); (sec === 'chats' ? $('#question') : $('#s-item')).focus(); }
+    catch { note(sec === 'chats' ? 'chat' : 'shop', 'Не получилось создать. Попробуй ещё раз.', true); }
   });
 
-  form.addEventListener('submit', async e => {
+  [['chats','chat'],['shops','shop']].forEach(([sec, which]) => {
+    const t = $('#' + which + '-title');
+    t.addEventListener('change', async () => {
+      const id = S[sec].active; if (!id) return;
+      try { await db.doc(sec + '/' + id).update({ title: t.value.trim() || (sec === 'chats' ? 'Новая беседа' : 'Новый поиск') }); }
+      catch { note(which, 'Не получилось переименовать.', true); }
+    });
+    t.addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+    $('#' + which + '-del').addEventListener('click', () => removeCurrent(sec));
+  });
+
+  chatForm.addEventListener('submit', async e => {
     e.preventDefault();
-    const q = $('#question').value.trim();
-    const s = readSettings();
-    if (!q){ say('Напиши вопрос, прежде чем отправлять.', true); $('#question').focus(); return; }
-    if (!s.models.length){ say('Выбери хотя бы одну модель.', true); $('#settings-box').open = true; return; }
-    $('#send').disabled = true; say('Отправляю…');
+    const q = $('#question').value.trim(); const s = readChat();
+    if (!q){ note('chat', 'Напиши вопрос, прежде чем отправлять.', true); $('#question').focus(); return; }
+    if (!s.models.length){ note('chat', 'Выбери хотя бы одну модель.', true); $('#settings-box').open = true; return; }
+    $('#chat-send').disabled = true; note('chat', 'Отправляю…');
     try {
-      let id = activeId;
-      const autoTitle = q.length > 48 ? q.slice(0, 46).trim() + '…' : q;
-      if (!id){ id = await createChat(autoTitle); selectChat(id); }
+      let id = S.chats.active;
+      if (!id){ id = await create('chats', autoTitle(q)); select('chats', id); }
       const now = new Date().toISOString();
       await db.collection('chats/' + id + '/messages').doc().set({ role:'user', text:q, createdAt:now });
-      const cur = chats.find(c => c.id === id);
+      const cur = S.chats.items.find(c => c.id === id);
       const patch = { ...s, status:'sent', sentAt:now, updatedAt:now };
-      if (!cur || !cur.title || cur.title === 'Новая беседа') patch.title = autoTitle;
+      if (!cur || !cur.title || cur.title === 'Новая беседа') patch.title = autoTitle(q);
       await db.doc('chats/' + id).update(patch);
       $('#question').value = '';
-      say('Отправлено. Теперь напиши в чат «го».');
-    } catch {
-      say('Не получилось отправить. Попробуй ещё раз через пару секунд.', true);
-    } finally {
-      $('#send').disabled = false;
-    }
+      note('chat', 'Отправлено. Теперь напиши в чат «го».');
+    } catch { note('chat', 'Не получилось отправить. Попробуй ещё раз через пару секунд.', true); }
+    finally { $('#chat-send').disabled = false; }
+  });
+
+  shopForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const s = readShop();
+    if (!s.item){ note('shop', 'Напиши, что ищем.', true); $('#s-item').focus(); return; }
+    if (!s.markets.length){ note('shop', 'Выбери, где искать.', true); return; }
+    $('#shop-send').disabled = true; note('shop', 'Отправляю…');
+    try {
+      let id = S.shops.active;
+      const title = autoTitle(s.item + (s.maxPrice ? ' до ' + rub(s.maxPrice) : ''));
+      if (!id){ id = await create('shops', title); select('shops', id); }
+      const now = new Date().toISOString();
+      const cur = S.shops.items.find(c => c.id === id);
+      const patch = { ...s, status:'sent', sentAt:now, updatedAt:now };
+      if (!cur || !cur.title || cur.title === 'Новый поиск') patch.title = title;
+      await db.doc('shops/' + id).update(patch);
+      note('shop', 'Отправлено. Теперь напиши в чат «го».');
+    } catch { note('shop', 'Не получилось отправить. Попробуй ещё раз через пару секунд.', true); }
+    finally { $('#shop-send').disabled = false; }
   });
 })();
 </script>
