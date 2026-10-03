@@ -7,10 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500&display=swap">
 <style>
-/* Layout: control panel on the left, results and gallery on the right; one dark studio look */
+/* Layout: control panel on the left, gallery on the right; editor and upscaler open as large dialogs. One dark studio look. */
 :root{
   --bg:#0f1312; --panel:#171d1b; --raise:#1f2725; --ink:#e6ece9; --muted:#8f9b96; --line:#2b3532;
-  --accent:#5fc2b3; --accent-ink:#0b1110; --bad:#ef8d82; --warn:#e3b65f;
+  --accent:#5fc2b3; --accent-ink:#0b1110; --bad:#ef8d82; --warn:#e3b65f; --mask:#8b5cff;
   --f-display:"Unbounded","IBM Plex Sans",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
@@ -20,18 +20,20 @@
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;padding:16px}
 .app{display:grid;gap:16px;grid-template-columns:1fr;max-width:1500px;margin:0 auto}
-@media (min-width:980px){.app{grid-template-columns:380px minmax(0,1fr);align-items:start}}
+@media (min-width:980px){.app{grid-template-columns:390px minmax(0,1fr);align-items:start}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:16px}
 @media (min-width:980px){.panel{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}}
 h1{font-family:var(--f-display);font-weight:500;font-size:20px;margin:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 h1 small{font-family:var(--f-body);font-size:13px;font-weight:400;color:var(--muted)}
-.key{font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--warn);color:var(--warn)}
-.lbl{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px}
-.lbl a,.lbl button{font:inherit;text-transform:none;letter-spacing:0;font-weight:500;color:var(--accent);background:none;border:0;cursor:pointer;padding:0}
+h2{margin:0;font-family:var(--f-display);font-weight:500;font-size:16px}
+.key{font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--warn);color:var(--warn);margin:0}
+.lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px}
+.link{font:inherit;font-size:13px;text-transform:none;letter-spacing:0;font-weight:500;color:var(--accent);background:none;border:0;cursor:pointer;padding:0}
 select,textarea,input[type=text],input[type=number]{width:100%;font:inherit;color:var(--ink);background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
 textarea{resize:vertical}
 #prompt{min-height:110px}
-select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select:focus-visible,textarea:focus-visible,input:focus-visible,.link:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input[type=range]{width:100%;accent-color:var(--accent)}
 .hint{font-size:12px;color:var(--muted);margin:6px 0 0}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{position:relative}
@@ -39,46 +41,57 @@ select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
 .chip span{display:inline-block;padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--raise);font-size:13px;cursor:pointer}
 .chip input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
-.ratio span{font-family:var(--f-mono);font-size:12px}
-.drop{border:1px dashed var(--line);border-radius:10px;padding:12px;display:flex;gap:12px;align-items:center;cursor:pointer;color:var(--muted);font-size:13px}
+.mono span{font-family:var(--f-mono);font-size:12px}
+.refs{display:grid;gap:8px}
+.ref{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:6px}
+.ref img{width:52px;height:52px;object-fit:cover;border-radius:6px}
+.ref select{padding:6px 8px;font-size:13px}
+.x{font:inherit;background:none;border:0;color:var(--muted);cursor:pointer;font-size:18px;padding:4px 8px}
+.x:hover{color:var(--bad)}
+.drop{border:1px dashed var(--line);border-radius:10px;padding:12px;cursor:pointer;color:var(--muted);font-size:13px;display:block}
 .drop.over{border-color:var(--accent);color:var(--ink)}
-.drop img{width:64px;height:64px;object-fit:cover;border-radius:6px}
 .seed{display:flex;gap:8px}
 .seed input{flex:1;min-width:0}
-.btn{font:inherit;font-weight:600;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--raise);color:var(--ink);cursor:pointer}
+.btn{font:inherit;font-weight:600;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--raise);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-block}
 .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn:disabled{opacity:.5;cursor:default}
-.go{width:100%;padding:13px;font-size:16px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.go{width:100%;padding:13px;font-size:16px}
 .msg{font-size:13px;margin:0;min-height:1em;white-space:pre-wrap}
 .msg.err{color:var(--bad)}
 
 .main{display:grid;gap:14px;min-width:0}
-.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;justify-content:space-between}
-.bar h2{margin:0;font-family:var(--f-display);font-weight:500;font-size:16px}
-.bar span{font-size:13px;color:var(--muted);font-family:var(--f-mono)}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.bar .sum{font-size:13px;color:var(--muted);font-family:var(--f-mono)}
 .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
 .tile{position:relative;border-radius:10px;overflow:hidden;background:var(--panel);border:1px solid var(--line);aspect-ratio:1;cursor:pointer;padding:0}
 .tile img{width:100%;height:100%;object-fit:cover;display:block}
 .tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.tile .cap{position:absolute;left:0;right:0;bottom:0;padding:18px 8px 6px;font-size:11px;font-family:var(--f-mono);color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.7));text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .cap{position:absolute;left:0;right:0;bottom:0;padding:18px 8px 6px;font-size:11px;font-family:var(--f-mono);color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75));text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .kind{position:absolute;top:6px;left:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.6);color:#fff}
 .tile.wait{display:grid;place-items:center;cursor:default;color:var(--muted);font-size:13px}
 .tile.wait::before{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(95,194,179,.12) 50%,transparent 70%);background-size:200% 100%;animation:shine 1.4s linear infinite}
 @keyframes shine{from{background-position:200% 0}to{background-position:-200% 0}}
 .empty{border:1px dashed var(--line);border-radius:10px;padding:20px;color:var(--muted)}
 
-dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);padding:0;max-width:min(1100px,96vw);width:100%}
-dialog::backdrop{background:rgba(0,0,0,.7)}
-.lb{display:grid;grid-template-columns:1fr;gap:0}
-@media (min-width:860px){.lb{grid-template-columns:minmax(0,1fr) 320px}}
-.lb-img{background:#000;display:grid;place-items:center;min-height:240px}
-.lb-img img{max-width:100%;max-height:80vh;display:block}
-.lb-side{padding:16px;display:grid;gap:12px;align-content:start}
-.lb-side dl{margin:0;display:grid;gap:8px;font-size:13px}
-.lb-side dt{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em}
-.lb-side dd{margin:0;overflow-wrap:anywhere}
-.lb-actions{display:flex;flex-wrap:wrap;gap:8px}
-.lb-actions a{text-decoration:none;display:inline-block}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);padding:0;max-width:min(1200px,96vw);width:100%}
+dialog::backdrop{background:rgba(0,0,0,.75)}
+.dlg{display:grid;grid-template-columns:1fr}
+@media (min-width:900px){.dlg{grid-template-columns:minmax(0,1fr) 330px}}
+.stage{background:#000;display:grid;place-items:center;min-height:260px;padding:8px}
+.stage img{max-width:100%;max-height:82vh;display:block}
+.side{padding:16px;display:grid;gap:14px;align-content:start}
+.side dl{margin:0;display:grid;gap:8px;font-size:13px}
+.side dt{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em}
+.side dd{margin:0;overflow-wrap:anywhere}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
 .del.armed{border-color:var(--bad);color:var(--bad)}
+.canvas-wrap{position:relative;display:inline-block;max-width:100%;line-height:0;touch-action:none}
+.canvas-wrap canvas{max-width:100%;max-height:78vh;display:block}
+#ed-mask{position:absolute;inset:0;width:100%;height:100%;opacity:.55;cursor:crosshair}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--accent)}
+.val{font-family:var(--f-mono);font-size:12px;color:var(--ink)}
 @media (prefers-reduced-motion:reduce){.tile.wait::before{animation:none}}
 </style>
 </head>
@@ -95,7 +108,7 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
     </div>
 
     <div>
-      <div class="lbl"><label for="prompt">Промпт</label><button type="button" id="enhance">✦ Улучшить промпт</button></div>
+      <div class="lbl"><label for="prompt">Промпт</label><button type="button" class="link" id="enhance">✦ Улучшить промпт</button></div>
       <textarea id="prompt" placeholder="Что нарисовать. Можно по-русски: «Улучшить промпт» переведёт и распишет детали."></textarea>
     </div>
 
@@ -105,27 +118,19 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
     </div>
 
     <div>
-      <span class="lbl">Стиль</span>
-      <div class="chips" id="styles"></div>
-    </div>
-
-    <div>
-      <span class="lbl">Формат</span>
-      <div class="chips ratio" id="ratios"></div>
-    </div>
-
-    <div>
-      <span class="lbl">Сколько вариантов</span>
-      <div class="chips" id="counts"></div>
-    </div>
-
-    <div>
-      <div class="lbl"><span>Референс</span><button type="button" id="ref-clear" hidden>убрать</button></div>
+      <div class="lbl"><span>Референсы</span><span id="ref-count"></span></div>
+      <div class="refs" id="refs"></div>
       <label class="drop" id="drop">
-        <input type="file" id="ref-file" accept="image/*" hidden>
-        <img id="ref-preview" alt="" hidden>
-        <span id="ref-text">Перетащи картинку или нажми, чтобы выбрать. Модель сделает вариацию или изменит её по промпту.</span>
+        <input type="file" id="ref-file" accept="image/*" multiple hidden>
+        + Добавить картинку: перетащи или нажми. Для каждой выбери роль: поза, композиция, стиль, лицо, предмет или основа для правки.
       </label>
+    </div>
+
+    <div><span class="lbl">Стиль</span><div class="chips" id="styles"></div></div>
+    <div><span class="lbl">Формат</span><div class="chips mono" id="ratios"></div></div>
+    <div class="seed">
+      <div style="flex:1"><span class="lbl">Разрешение</span><div class="chips mono" id="res"></div></div>
+      <div style="flex:1"><span class="lbl">Вариантов</span><div class="chips mono" id="counts"></div></div>
     </div>
 
     <div>
@@ -134,31 +139,78 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
         <input type="number" id="seed" placeholder="случайный" min="0" step="1">
         <button type="button" class="btn" id="seed-rand" title="Сбросить seed">↺</button>
       </div>
-      <p class="hint">Один и тот же seed с тем же промптом даёт похожий результат, если модель это поддерживает.</p>
     </div>
 
-    <button type="submit" class="btn go" id="go">Создать</button>
+    <button type="submit" class="btn primary go" id="go">Создать</button>
     <p class="msg" id="msg" role="status"></p>
   </form>
 
   <section class="main">
-    <div class="bar"><h2>Галерея</h2><span id="count"></span></div>
+    <div class="bar">
+      <h2>Галерея</h2>
+      <span class="sum" id="count"></span>
+      <label class="btn" for="upload">+ Загрузить своё фото<input type="file" id="upload" accept="image/*" hidden></label>
+    </div>
     <div class="grid" id="grid"></div>
   </section>
 </div>
 
+<!-- Просмотр -->
 <dialog id="lb">
-  <div class="lb">
-    <div class="lb-img"><img id="lb-img" alt=""></div>
-    <div class="lb-side">
+  <div class="dlg">
+    <div class="stage"><img id="lb-img" alt=""></div>
+    <div class="side">
       <dl id="lb-meta"></dl>
-      <div class="lb-actions">
-        <a class="btn" id="lb-download" download>Скачать</a>
+      <div class="actions">
+        <button type="button" class="btn primary" id="lb-edit">Маска</button>
+        <button type="button" class="btn primary" id="lb-up">Увеличить</button>
+        <button type="button" class="btn" id="lb-ref">В референсы</button>
         <button type="button" class="btn" id="lb-reuse">Повторить настройки</button>
-        <button type="button" class="btn" id="lb-ref">Как референс</button>
+        <a class="btn" id="lb-download" download>Скачать</a>
         <button type="button" class="btn del" id="lb-del">Удалить</button>
         <button type="button" class="btn" id="lb-close">Закрыть</button>
       </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Редактор маски -->
+<dialog id="ed">
+  <div class="dlg">
+    <div class="stage">
+      <div class="canvas-wrap"><canvas id="ed-img"></canvas><canvas id="ed-mask"></canvas></div>
+    </div>
+    <div class="side">
+      <h2>Правка по маске</h2>
+      <p class="hint" style="margin:0">Закрась кистью область, которую нужно изменить, и напиши, что с ней сделать.</p>
+      <div><span class="lbl">Инструмент</span><div class="chips" id="ed-tool"></div></div>
+      <div><div class="lbl"><label for="ed-size">Размер кисти</label><span class="val" id="ed-size-val"></span></div><input type="range" id="ed-size" min="5" max="250" value="60"></div>
+      <div class="actions"><button type="button" class="btn" id="ed-clear">Очистить маску</button><button type="button" class="btn" id="ed-invert">Инвертировать</button></div>
+      <div><label class="lbl" for="ed-text">Что сделать</label><textarea id="ed-text" rows="3" placeholder="Заменить куртку на красную кожаную; убрать человека; добавить шляпу"></textarea></div>
+      <div><label class="lbl" for="ed-model">Модель</label><select id="ed-model"></select><p class="hint">Лучше всего правят Gemini и Seedream.</p></div>
+      <label class="check"><input type="checkbox" id="ed-keep" checked><span>Сохранить нетронутым всё вне маски: результат накладывается на оригинал только в закрашенной области, с мягким краем.</span></label>
+      <button type="button" class="btn primary" id="ed-go">Применить</button>
+      <button type="button" class="btn" id="ed-close">Отмена</button>
+      <p class="msg" id="ed-msg" role="status"></p>
+    </div>
+  </div>
+</dialog>
+
+<!-- Увеличение -->
+<dialog id="up">
+  <div class="dlg">
+    <div class="stage"><img id="up-img" alt=""></div>
+    <div class="side">
+      <h2>Художественное увеличение</h2>
+      <p class="hint" style="margin:0">Модель перерисовывает картинку в высоком разрешении и добавляет детали. Потом новый слой подмешивается к оригиналу в нужной пропорции.</p>
+      <div><span class="lbl">Творчество</span><div class="chips" id="up-level"></div><p class="hint" id="up-level-hint"></p></div>
+      <div><span class="lbl">Разрешение</span><div class="chips mono" id="up-res"></div></div>
+      <div><div class="lbl"><label for="up-mix">Сила нового слоя</label><span class="val" id="up-mix-val"></span></div><input type="range" id="up-mix" min="0" max="100" value="80"><p class="hint">100% — только новая версия. Меньше — сквозь неё проступает оригинал, как слой с прозрачностью в фотошопе.</p></div>
+      <div><label class="lbl" for="up-text">Подсказка (необязательно)</label><input type="text" id="up-text" placeholder="кожа естественная, без пластика"></div>
+      <div><label class="lbl" for="up-model">Модель</label><select id="up-model"></select><p class="hint">Для 4K лучше Seedream.</p></div>
+      <button type="button" class="btn primary" id="up-go">Увеличить</button>
+      <button type="button" class="btn" id="up-close">Отмена</button>
+      <p class="msg" id="up-msg" role="status"></p>
     </div>
   </div>
 </dialog>
@@ -170,50 +222,77 @@ const STYLES = [
   ['photo', 'Фото', 'photorealistic photograph, natural light, 50mm lens, high detail'],
   ['cinema', 'Кино', 'cinematic film still, anamorphic lens, dramatic lighting, color graded'],
   ['anime', 'Аниме', 'anime illustration, clean line art, vibrant cel shading'],
-  ['3d', '3D', '3D render, octane, soft global illumination, studio lighting'],
+  ['3d', '3D', '3D render, soft global illumination, studio lighting'],
   ['art', 'Живопись', 'oil painting, visible brush strokes, rich textures'],
   ['illu', 'Иллюстрация', 'editorial illustration, flat shapes, limited palette'],
   ['pixel', 'Пиксель-арт', 'pixel art, 16-bit, crisp pixels, limited palette'],
   ['minimal', 'Минимализм', 'minimalist composition, negative space, simple shapes'],
 ];
-const RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2'];
-let models = [], items = [], reference = null, current = null;
+const ROLES = [['base','Основа для правки'],['pose','Поза'],['composition','Композиция'],['style','Стиль'],['character','Лицо / персонаж'],['object','Предмет']];
+const RATIOS = ['1:1','3:4','4:3','9:16','16:9','2:3','3:2','21:9'];
+const LEVELS = [['1','Бережно','Только резкость и мелкие детали, ничего не меняет.'],['2','Умеренно','Богаче текстуры и свет, лица и цвета на месте.'],['3','Творчески','Сильная перерисовка с новыми деталями, как у Magnific.']];
+let models = [], items = [], refs = [], current = null;
 
+/* ---------- utils ---------- */
 function chips(box, name, list, checked){
   box.replaceChildren(...list.map(([v, label]) => {
     const l = document.createElement('label'); l.className = 'chip';
     const i = document.createElement('input'); i.type = 'radio'; i.name = name; i.value = v; i.checked = v === checked;
-    const s = document.createElement('span'); s.textContent = label;
-    l.append(i, s); return l;
+    const s = document.createElement('span'); s.textContent = label; l.append(i, s); return l;
   }));
 }
-chips($('#styles'), 'style', STYLES, '');
-chips($('#ratios'), 'ratio', RATIOS.map(r => [r, r]), '1:1');
-chips($('#counts'), 'n', [['1','1'],['2','2'],['3','3'],['4','4']], '2');
-
-const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
-function setRadio(n, v){ document.querySelectorAll(`input[name=${n}]`).forEach(i => i.checked = i.value === v); }
-function say(t, err){ const m = $('#msg'); m.textContent = t; m.classList.toggle('err', !!err); }
-
+const radio = n => (document.querySelector(`input[name="${n}"]:checked`) || {}).value;
+function setRadio(n, v){ document.querySelectorAll(`input[name="${n}"]`).forEach(i => i.checked = i.value === v); }
+function sayIn(id, t, err){ const m = $('#' + id); m.textContent = t; m.classList.toggle('err', !!err); }
+const say = (t, err) => sayIn('msg', t, err);
 async function j(url, init){
   const r = await fetch(url, init);
   const d = await r.json().catch(() => ({}));
   if (!r.ok && !(d.items && d.items.length)) throw new Error(d.error || (d.errors || []).join('\n') || 'Ошибка ' + r.status);
   return d;
 }
+const post = (url, body) => j(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+function loadImg(src){ return new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('Не загрузилась картинка.')); i.src = src; }); }
+async function fileToDataUrl(blob, max, type = 'image/jpeg'){
+  const img = await createImageBitmap(blob);
+  const k = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL(type, 0.93);
+}
+function nearestRatio(w, h){
+  const r = w / h; let best = '1:1', d = 9;
+  for (const s of RATIOS){ const [a, b] = s.split(':').map(Number); const x = Math.abs(Math.log(r / (a / b))); if (x < d){ d = x; best = s; } }
+  return best;
+}
 
-function price(m){
-  const p = m.pricing || {};
-  const v = p.image || p.per_image || p.request;
-  return v ? ' · ~$' + Number(v).toFixed(3) + ' за картинку' : '';
+/* ---------- controls ---------- */
+chips($('#styles'), 'style', STYLES, '');
+chips($('#ratios'), 'ratio', RATIOS.map(r => [r, r]), '1:1');
+chips($('#res'), 'res', [['1K','1K'],['2K','2K'],['4K','4K']], '1K');
+chips($('#counts'), 'n', [['1','1'],['2','2'],['3','3'],['4','4']], '2');
+chips($('#ed-tool'), 'tool', [['brush','Кисть'],['erase','Ластик']], 'brush');
+chips($('#up-level'), 'level', LEVELS.map(l => [l[0], l[1]]), '2');
+chips($('#up-res'), 'upres', [['2K','2K'],['4K','4K']], '4K');
+const levelHint = () => $('#up-level-hint').textContent = (LEVELS.find(l => l[0] === radio('level')) || LEVELS[0])[2];
+$('#up-level').addEventListener('change', levelHint); levelHint();
+$('#up-mix').addEventListener('input', () => $('#up-mix-val').textContent = $('#up-mix').value + '%'); $('#up-mix-val').textContent = '80%';
+$('#ed-size').addEventListener('input', () => $('#ed-size-val').textContent = $('#ed-size').value + ' px'); $('#ed-size-val').textContent = '60 px';
+$('#seed-rand').addEventListener('click', () => $('#seed').value = '');
+
+/* ---------- models ---------- */
+function price(m){ const p = m.pricing || {}; const v = p.image || p.per_image || p.request; return v ? ' · ~$' + Number(v).toFixed(3) + ' за картинку' : ''; }
+function fillSelect(sel, prefer){
+  sel.replaceChildren(...models.map(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; return o; }));
+  const pick = prefer.map(p => models.find(m => m.id.includes(p))).find(Boolean);
+  if (pick) sel.value = pick.id;
 }
 async function loadModels(){
   try {
-    const d = await j('/api/models');
-    models = d.models || [];
-    const saved = localStorage.getItem('studio.model');
-    $('#model').replaceChildren(...models.map(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; return o; }));
-    if (saved && models.find(m => m.id === saved)) $('#model').value = saved;
+    models = (await j('/api/models')).models || [];
+    fillSelect($('#model'), [localStorage.getItem('studio.model') || 'flux.2-pro', 'flux']);
+    fillSelect($('#ed-model'), ['gemini', 'seedream']);
+    fillSelect($('#up-model'), ['seedream', 'gemini']);
     showModel();
   } catch (e) { say(e.message, true); }
 }
@@ -224,59 +303,66 @@ function showModel(){
 }
 $('#model').addEventListener('change', showModel);
 
+/* ---------- references ---------- */
+function renderRefs(){
+  $('#ref-count').textContent = refs.length ? refs.length + ' из 6' : '';
+  $('#refs').replaceChildren(...refs.map((r, i) => {
+    const row = document.createElement('div'); row.className = 'ref';
+    const img = document.createElement('img'); img.src = r.image; img.alt = 'Референс ' + (i + 1);
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Роль референса ' + (i + 1));
+    ROLES.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.append(o); });
+    sel.value = r.role; sel.addEventListener('change', () => r.role = sel.value);
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '×'; x.title = 'Убрать';
+    x.addEventListener('click', () => { refs.splice(i, 1); renderRefs(); });
+    row.append(img, sel, x); return row;
+  }));
+}
+async function addRef(blob, role){
+  if (refs.length >= 6){ say('Не больше 6 референсов.', true); return; }
+  try { refs.push({ image: await fileToDataUrl(blob, 1536), role: role || (refs.length ? 'style' : 'base') }); renderRefs(); }
+  catch { say('Не получилось прочитать картинку.', true); }
+}
+$('#ref-file').addEventListener('change', async e => { for (const f of e.target.files) await addRef(f); e.target.value = ''; });
+const drop = $('#drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', async e => { e.preventDefault(); drop.classList.remove('over'); for (const f of e.dataTransfer.files) await addRef(f); });
+
+/* ---------- gallery ---------- */
+const KIND = { edit: 'маска', upscale: 'увеличено', upload: 'фото' };
 function tile(it){
   const b = document.createElement('button'); b.type = 'button'; b.className = 'tile';
-  const img = document.createElement('img'); img.loading = 'lazy'; img.src = '/output/' + it.file; img.alt = it.prompt;
-  const cap = document.createElement('span'); cap.className = 'cap'; cap.textContent = it.prompt;
-  b.append(img, cap); b.addEventListener('click', () => open(it)); return b;
+  const img = document.createElement('img'); img.loading = 'lazy'; img.src = '/output/' + it.file + '?v=' + (it.note ? it.note.length : 0); img.alt = it.prompt || '';
+  const cap = document.createElement('span'); cap.className = 'cap'; cap.textContent = it.prompt || '';
+  b.append(img, cap);
+  if (KIND[it.kind]){ const k = document.createElement('span'); k.className = 'kind'; k.textContent = KIND[it.kind]; b.append(k); }
+  b.addEventListener('click', () => openItem(it)); return b;
 }
 function render(pending = 0){
   const g = $('#grid');
   const waits = Array.from({ length: pending }, () => { const d = document.createElement('div'); d.className = 'tile wait'; d.textContent = 'Рисую…'; return d; });
-  if (!items.length && !pending){
-    g.replaceChildren(Object.assign(document.createElement('div'), { className: 'empty', textContent: 'Здесь будут твои картинки. Напиши промпт слева и нажми «Создать».' }));
-  } else g.replaceChildren(...waits, ...items.map(tile));
+  if (!items.length && !pending) g.replaceChildren(Object.assign(document.createElement('div'), { className: 'empty', textContent: 'Здесь будут твои картинки. Напиши промпт слева и нажми «Создать» или загрузи своё фото, чтобы править его маской и увеличивать.' }));
+  else g.replaceChildren(...waits, ...items.map(tile));
   const total = items.reduce((s, i) => s + (i.cost || 0), 0);
   $('#count').textContent = items.length + ' шт.' + (total ? ' · потрачено $' + total.toFixed(2) : '');
 }
 async function loadGallery(){ try { items = (await j('/api/gallery')).items || []; render(); } catch (e) { say(e.message, true); } }
+function upsert(it){ items = [it, ...items.filter(i => i.id !== it.id)]; render(); }
 
-async function toDataUrl(blob){
-  const img = await createImageBitmap(blob);
-  const max = 1536, k = Math.min(1, max / Math.max(img.width, img.height));
-  const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-  return c.toDataURL('image/jpeg', 0.92);
-}
-async function setReference(blob){
-  try {
-    reference = await toDataUrl(blob);
-    $('#ref-preview').src = reference; $('#ref-preview').hidden = false;
-    $('#ref-text').textContent = 'Референс добавлен. Модель возьмёт его за основу.';
-    $('#ref-clear').hidden = false;
-  } catch { say('Не получилось прочитать картинку.', true); }
-}
-function clearReference(){
-  reference = null; $('#ref-preview').hidden = true; $('#ref-clear').hidden = true; $('#ref-file').value = '';
-  $('#ref-text').textContent = 'Перетащи картинку или нажми, чтобы выбрать. Модель сделает вариацию или изменит её по промпту.';
-}
-$('#ref-file').addEventListener('change', e => e.target.files[0] && setReference(e.target.files[0]));
-$('#ref-clear').addEventListener('click', clearReference);
-const drop = $('#drop');
-drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
-drop.addEventListener('dragleave', () => drop.classList.remove('over'));
-drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) setReference(f); });
-$('#seed-rand').addEventListener('click', () => $('#seed').value = '');
+$('#upload').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  say('Загружаю фото…');
+  try { const d = await post('/api/upload', { image: await fileToDataUrl(f, 4096), name: f.name }); upsert(d.item); say('Фото в галерее. Открой его, чтобы править маской или увеличить.'); }
+  catch (err) { say(err.message, true); }
+});
 
+/* ---------- generate ---------- */
 $('#enhance').addEventListener('click', async () => {
   const idea = $('#prompt').value.trim();
   if (!idea){ say('Сначала напиши идею.', true); return; }
   const b = $('#enhance'); b.disabled = true; say('Улучшаю промпт…');
-  try {
-    const d = await j('/api/enhance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idea, model: $('#model').value }) });
-    $('#prompt').value = d.prompt; say('Промпт улучшен. Можно поправить и создавать.');
-  } catch (e) { say(e.message, true); }
-  finally { b.disabled = false; }
+  try { $('#prompt').value = (await post('/api/enhance', { idea, model: $('#model').value })).prompt; say('Промпт улучшен. Можно поправить и создавать.'); }
+  catch (e) { say(e.message, true); } finally { b.disabled = false; }
 });
 
 $('#form').addEventListener('submit', async e => {
@@ -286,11 +372,11 @@ $('#form').addEventListener('submit', async e => {
   const style = STYLES.find(s => s[0] === radio('style')) || STYLES[0];
   const n = Number(radio('n') || 1);
   const seedVal = $('#seed').value === '' ? null : parseInt($('#seed').value, 10);
-  const body = { model: $('#model').value, prompt, negative: $('#negative').value.trim(), style: style[0], styleText: style[2] || '',
-    aspect_ratio: radio('ratio'), n, seed: Number.isInteger(seedVal) ? seedVal : null, reference };
   $('#go').disabled = true; say('Создаю ' + n + '…'); render(n);
   try {
-    const d = await j('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await post('/api/generate', { mode: 'generate', model: $('#model').value, prompt, negative: $('#negative').value.trim(),
+      style: style[0], styleText: style[2] || '', aspect_ratio: radio('ratio'), resolution: radio('res'), n,
+      seed: Number.isInteger(seedVal) ? seedVal : null, references: refs });
     items = [...d.items, ...items]; render();
     const cost = d.items.reduce((s, i) => s + (i.cost || 0), 0);
     say('Готово: ' + d.items.length + ' шт.' + (cost ? ' за $' + cost.toFixed(3) : '') + (d.errors && d.errors.length ? '\nНе получилось: ' + d.errors.join('\n') : ''), d.errors && d.errors.length);
@@ -298,31 +384,31 @@ $('#form').addEventListener('submit', async e => {
   finally { $('#go').disabled = false; }
 });
 
-function open(it){
+/* ---------- lightbox ---------- */
+function openItem(it){
   current = it;
-  $('#lb-img').src = '/output/' + it.file; $('#lb-img').alt = it.prompt;
+  const src = '/output/' + it.file + '?v=' + Date.now();
+  $('#lb-img').src = src; $('#lb-img').alt = it.prompt || '';
   $('#lb-download').href = '/output/' + it.file; $('#lb-download').download = it.file;
-  const rows = [['Промпт', it.prompt], ['Модель', it.model], ['Стиль', (STYLES.find(s => s[0] === it.style) || STYLES[0])[1]],
-    ['Формат', it.aspect_ratio || '—'], ['Seed', it.seed ?? 'случайный'], ['Чего избегать', it.negative || '—'],
-    ['Референс', it.hadReference ? 'был' : 'нет'], ['Цена', it.cost != null ? '$' + it.cost.toFixed(4) : '—'],
-    ['Создано', new Date(it.createdAt).toLocaleString('ru-RU')]];
-  $('#lb-meta').replaceChildren(...rows.flatMap(([k, v]) => [Object.assign(document.createElement('dt'), { textContent: k }), Object.assign(document.createElement('dd'), { textContent: String(v) })]));
+  const rows = [['Промпт', it.prompt], ['Тип', KIND[it.kind] || 'генерация'], ['Модель', it.model], ['Формат', it.aspect_ratio || '—'],
+    ['Разрешение', it.resolution || '—'], ['Seed', it.seed ?? '—'], ['Референсы', (it.roles || []).map(r => (ROLES.find(x => x[0] === r) || [, r])[1]).join(', ') || '—'],
+    ['Обработка', it.note || '—'], ['Цена', it.cost != null ? '$' + it.cost.toFixed(4) : '—'], ['Создано', new Date(it.createdAt).toLocaleString('ru-RU')]];
+  $('#lb-meta').replaceChildren(...rows.flatMap(([k, v]) => [Object.assign(document.createElement('dt'), { textContent: k }), Object.assign(document.createElement('dd'), { textContent: String(v ?? '—') })]));
   const del = $('#lb-del'); del.classList.remove('armed'); del.textContent = 'Удалить';
-  $('#lb').showModal();
+  if (!$('#lb').open) $('#lb').showModal();
 }
 $('#lb-close').addEventListener('click', () => $('#lb').close());
-$('#lb').addEventListener('click', e => { if (e.target === $('#lb')) $('#lb').close(); });
 $('#lb-reuse').addEventListener('click', () => {
   const it = current; if (!it) return;
-  $('#prompt').value = it.prompt; $('#negative').value = it.negative || '';
-  if (models.find(m => m.id === it.model)) { $('#model').value = it.model; showModel(); }
-  setRadio('style', it.style || ''); if (it.aspect_ratio) setRadio('ratio', it.aspect_ratio);
-  $('#seed').value = it.seed ?? '';
-  $('#lb').close(); say('Настройки перенесены.');
+  if (it.kind && it.kind !== 'generate'){ say('Настройки можно повторить только у обычной генерации.', true); $('#lb').close(); return; }
+  $('#prompt').value = it.prompt || ''; $('#negative').value = it.negative || '';
+  if (models.find(m => m.id === it.model)){ $('#model').value = it.model; showModel(); }
+  setRadio('style', it.style || ''); if (it.aspect_ratio) setRadio('ratio', it.aspect_ratio); if (it.resolution) setRadio('res', it.resolution);
+  $('#seed').value = it.seed ?? ''; $('#lb').close(); say('Настройки перенесены.');
 });
 $('#lb-ref').addEventListener('click', async () => {
-  const r = await fetch('/output/' + current.file); await setReference(await r.blob());
-  $('#lb').close(); say('Картинка стала референсом.');
+  const r = await fetch('/output/' + current.file); await addRef(await r.blob(), refs.length ? 'style' : 'base');
+  $('#lb').close(); say('Картинка добавлена в референсы. Выбери ей роль.');
 });
 $('#lb-del').addEventListener('click', async () => {
   const b = $('#lb-del');
@@ -331,9 +417,108 @@ $('#lb-del').addEventListener('click', async () => {
   catch (e) { say(e.message, true); }
 });
 
+/* ---------- mask editor ---------- */
+const edImg = $('#ed-img'), edMask = $('#ed-mask');
+let edSource = null, drawing = false, last = null;
+async function openEditor(it){
+  edSource = it;
+  const img = await loadImg('/output/' + it.file + '?v=' + Date.now());
+  edImg.width = edMask.width = img.naturalWidth; edImg.height = edMask.height = img.naturalHeight;
+  edImg.getContext('2d').drawImage(img, 0, 0);
+  edMask.getContext('2d').clearRect(0, 0, edMask.width, edMask.height);
+  $('#ed-size').max = Math.max(60, Math.round(Math.max(img.naturalWidth, img.naturalHeight) / 6));
+  sayIn('ed-msg', ''); $('#lb').close(); $('#ed').showModal();
+}
+function pos(e){ const r = edMask.getBoundingClientRect(); return { x: (e.clientX - r.left) * edMask.width / r.width, y: (e.clientY - r.top) * edMask.height / r.height, k: edMask.width / r.width }; }
+function stroke(a, b){
+  const ctx = edMask.getContext('2d');
+  ctx.globalCompositeOperation = radio('tool') === 'erase' ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--mask').trim() || "#8b5cff";
+  ctx.lineCap = ctx.lineJoin = 'round'; ctx.lineWidth = Number($('#ed-size').value) * a.k;
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x + 0.01, b.y); ctx.stroke();
+}
+edMask.addEventListener('pointerdown', e => { drawing = true; edMask.setPointerCapture(e.pointerId); last = pos(e); stroke(last, last); });
+edMask.addEventListener('pointermove', e => { if (!drawing) return; const p = pos(e); stroke(last, p); last = p; });
+['pointerup','pointercancel','pointerleave'].forEach(t => edMask.addEventListener(t, () => drawing = false));
+$('#ed-clear').addEventListener('click', () => edMask.getContext('2d').clearRect(0, 0, edMask.width, edMask.height));
+$('#ed-invert').addEventListener('click', () => {
+  const ctx = edMask.getContext('2d');
+  const t = document.createElement('canvas'); t.width = edMask.width; t.height = edMask.height;
+  const tc = t.getContext('2d'); tc.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--mask').trim();
+  tc.fillRect(0, 0, t.width, t.height); tc.globalCompositeOperation = 'destination-out'; tc.drawImage(edMask, 0, 0);
+  ctx.clearRect(0, 0, edMask.width, edMask.height); ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(t, 0, 0);
+});
+$('#ed-close').addEventListener('click', () => $('#ed').close());
+// Белая маска на прозрачном фоне; с blur — для мягкого края при наложении.
+function whiteMask(blur){
+  const t = document.createElement('canvas'); t.width = edMask.width; t.height = edMask.height;
+  const c = t.getContext('2d'); if (blur) c.filter = `blur(${blur}px)`;
+  c.drawImage(edMask, 0, 0); c.filter = 'none'; c.globalCompositeOperation = 'source-in'; c.fillStyle = '#fff'; c.fillRect(0, 0, t.width, t.height);
+  return t;
+}
+function maskIsEmpty(){
+  const d = edMask.getContext('2d').getImageData(0, 0, edMask.width, edMask.height).data;
+  for (let i = 3; i < d.length; i += 64) if (d[i]) return false; return true;
+}
+$('#ed-go').addEventListener('click', async () => {
+  const text = $('#ed-text').value.trim();
+  if (!text){ sayIn('ed-msg', 'Напиши, что сделать в закрашенной области.', true); return; }
+  if (maskIsEmpty()){ sayIn('ed-msg', 'Закрась кистью область, которую нужно изменить.', true); return; }
+  const bw = document.createElement('canvas'); bw.width = edMask.width; bw.height = edMask.height;
+  const bc = bw.getContext('2d'); bc.fillStyle = '#000'; bc.fillRect(0, 0, bw.width, bw.height); bc.drawImage(whiteMask(0), 0, 0);
+  const btn = $('#ed-go'); btn.disabled = true; sayIn('ed-msg', 'Модель правит картинку…');
+  try {
+    const d = await post('/api/generate', { mode: 'edit', model: $('#ed-model').value, prompt: text, source: edSource.file,
+      mask: bw.toDataURL('image/png'), aspect_ratio: nearestRatio(edImg.width, edImg.height) });
+    let it = d.items[0];
+    if ($('#ed-keep').checked){
+      sayIn('ed-msg', 'Накладываю результат на оригинал…');
+      const res = await loadImg('/output/' + it.file);
+      const out = document.createElement('canvas'); out.width = edImg.width; out.height = edImg.height;
+      const oc = out.getContext('2d'); oc.drawImage(edImg, 0, 0);
+      const layer = document.createElement('canvas'); layer.width = out.width; layer.height = out.height;
+      const lc = layer.getContext('2d'); lc.drawImage(res, 0, 0, out.width, out.height);
+      lc.globalCompositeOperation = 'destination-in'; lc.drawImage(whiteMask(Math.max(4, Math.round(out.width / 120))), 0, 0);
+      oc.drawImage(layer, 0, 0);
+      it = (await post('/api/save', { image: out.toDataURL('image/png'), replaceId: it.id, note: 'наложено на оригинал по маске' })).item;
+    }
+    upsert(it); $('#ed').close(); openItem(it); say('Правка готова.');
+  } catch (e) { sayIn('ed-msg', e.message, true); }
+  finally { btn.disabled = false; }
+});
+
+/* ---------- upscale ---------- */
+let upSource = null;
+function openUpscale(it){ upSource = it; $('#up-img').src = '/output/' + it.file + '?v=' + Date.now(); sayIn('up-msg', ''); $('#lb').close(); $('#up').showModal(); }
+$('#up-close').addEventListener('click', () => $('#up').close());
+$('#up-go').addEventListener('click', async () => {
+  const btn = $('#up-go'); btn.disabled = true; sayIn('up-msg', 'Перерисовываю в высоком разрешении. Это может занять минуту…');
+  try {
+    const src = await loadImg('/output/' + upSource.file);
+    const d = await post('/api/generate', { mode: 'upscale', model: $('#up-model').value, source: upSource.file,
+      creativity: Number(radio('level')), resolution: radio('upres'), prompt: $('#up-text').value.trim(),
+      aspect_ratio: nearestRatio(src.naturalWidth, src.naturalHeight) });
+    let it = d.items[0];
+    const mix = Number($('#up-mix').value);
+    if (mix < 100){
+      sayIn('up-msg', 'Подмешиваю слой к оригиналу…');
+      const res = await loadImg('/output/' + it.file);
+      const out = document.createElement('canvas'); out.width = res.naturalWidth; out.height = res.naturalHeight;
+      const oc = out.getContext('2d'); oc.imageSmoothingQuality = 'high';
+      oc.drawImage(src, 0, 0, out.width, out.height); oc.globalAlpha = mix / 100; oc.drawImage(res, 0, 0);
+      it = (await post('/api/save', { image: out.toDataURL('image/png'), replaceId: it.id, note: 'новый слой ' + mix + '% поверх оригинала' })).item;
+    }
+    upsert(it); $('#up').close(); openItem(it); say('Увеличение готово.');
+  } catch (e) { sayIn('up-msg', e.message, true); }
+  finally { btn.disabled = false; }
+});
+$('#lb-edit').addEventListener('click', () => current && openEditor(current).catch(e => say(e.message, true)));
+$('#lb-up').addEventListener('click', () => current && openUpscale(current));
+
+/* ---------- boot ---------- */
 (async () => {
   try { const s = await j('/api/status'); $('#key-warn').hidden = s.hasKey; } catch {}
-  render(); loadModels(); loadGallery();
+  renderRefs(); render(); loadModels(); loadGallery();
 })();
 </script>
 </body>
