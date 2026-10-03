@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Студия · Консилиум</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500&display=swap">
+<style>
+/* Layout: control panel on the left, results and gallery on the right; one dark studio look */
+:root{
+  --bg:#0f1312; --panel:#171d1b; --raise:#1f2725; --ink:#e6ece9; --muted:#8f9b96; --line:#2b3532;
+  --accent:#5fc2b3; --accent-ink:#0b1110; --bad:#ef8d82; --warn:#e3b65f;
+  --f-display:"Unbounded","IBM Plex Sans",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;padding:16px}
+.app{display:grid;gap:16px;grid-template-columns:1fr;max-width:1500px;margin:0 auto}
+@media (min-width:980px){.app{grid-template-columns:380px minmax(0,1fr);align-items:start}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:16px}
+@media (min-width:980px){.panel{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}}
+h1{font-family:var(--f-display);font-weight:500;font-size:20px;margin:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h1 small{font-family:var(--f-body);font-size:13px;font-weight:400;color:var(--muted)}
+.key{font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--warn);color:var(--warn)}
+.lbl{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px}
+.lbl a,.lbl button{font:inherit;text-transform:none;letter-spacing:0;font-weight:500;color:var(--accent);background:none;border:0;cursor:pointer;padding:0}
+select,textarea,input[type=text],input[type=number]{width:100%;font:inherit;color:var(--ink);background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+textarea{resize:vertical}
+#prompt{min-height:110px}
+select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chip span{display:inline-block;padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--raise);font-size:13px;cursor:pointer}
+.chip input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.ratio span{font-family:var(--f-mono);font-size:12px}
+.drop{border:1px dashed var(--line);border-radius:10px;padding:12px;display:flex;gap:12px;align-items:center;cursor:pointer;color:var(--muted);font-size:13px}
+.drop.over{border-color:var(--accent);color:var(--ink)}
+.drop img{width:64px;height:64px;object-fit:cover;border-radius:6px}
+.seed{display:flex;gap:8px}
+.seed input{flex:1;min-width:0}
+.btn{font:inherit;font-weight:600;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--raise);color:var(--ink);cursor:pointer}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:disabled{opacity:.5;cursor:default}
+.go{width:100%;padding:13px;font-size:16px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.msg{font-size:13px;margin:0;min-height:1em;white-space:pre-wrap}
+.msg.err{color:var(--bad)}
+
+.main{display:grid;gap:14px;min-width:0}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;justify-content:space-between}
+.bar h2{margin:0;font-family:var(--f-display);font-weight:500;font-size:16px}
+.bar span{font-size:13px;color:var(--muted);font-family:var(--f-mono)}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.tile{position:relative;border-radius:10px;overflow:hidden;background:var(--panel);border:1px solid var(--line);aspect-ratio:1;cursor:pointer;padding:0}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tile .cap{position:absolute;left:0;right:0;bottom:0;padding:18px 8px 6px;font-size:11px;font-family:var(--f-mono);color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.7));text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.wait{display:grid;place-items:center;cursor:default;color:var(--muted);font-size:13px}
+.tile.wait::before{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(95,194,179,.12) 50%,transparent 70%);background-size:200% 100%;animation:shine 1.4s linear infinite}
+@keyframes shine{from{background-position:200% 0}to{background-position:-200% 0}}
+.empty{border:1px dashed var(--line);border-radius:10px;padding:20px;color:var(--muted)}
+
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);padding:0;max-width:min(1100px,96vw);width:100%}
+dialog::backdrop{background:rgba(0,0,0,.7)}
+.lb{display:grid;grid-template-columns:1fr;gap:0}
+@media (min-width:860px){.lb{grid-template-columns:minmax(0,1fr) 320px}}
+.lb-img{background:#000;display:grid;place-items:center;min-height:240px}
+.lb-img img{max-width:100%;max-height:80vh;display:block}
+.lb-side{padding:16px;display:grid;gap:12px;align-content:start}
+.lb-side dl{margin:0;display:grid;gap:8px;font-size:13px}
+.lb-side dt{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em}
+.lb-side dd{margin:0;overflow-wrap:anywhere}
+.lb-actions{display:flex;flex-wrap:wrap;gap:8px}
+.lb-actions a{text-decoration:none;display:inline-block}
+.del.armed{border-color:var(--bad);color:var(--bad)}
+@media (prefers-reduced-motion:reduce){.tile.wait::before{animation:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <form class="panel" id="form" novalidate>
+    <h1>Студия <small>картинки через OpenRouter</small></h1>
+    <p class="key" id="key-warn" hidden>Нет ключа. Добавь строку <code>OPENROUTER_API_KEY=...</code> в файл <code>.env</code> в корне репозитория и перезапусти студию.</p>
+
+    <div>
+      <label class="lbl" for="model">Модель</label>
+      <select id="model"><option>Загружаю список…</option></select>
+      <p class="hint" id="model-hint"></p>
+    </div>
+
+    <div>
+      <div class="lbl"><label for="prompt">Промпт</label><button type="button" id="enhance">✦ Улучшить промпт</button></div>
+      <textarea id="prompt" placeholder="Что нарисовать. Можно по-русски: «Улучшить промпт» переведёт и распишет детали."></textarea>
+    </div>
+
+    <div>
+      <label class="lbl" for="negative">Чего избегать</label>
+      <input type="text" id="negative" placeholder="размытость, лишние пальцы, текст">
+    </div>
+
+    <div>
+      <span class="lbl">Стиль</span>
+      <div class="chips" id="styles"></div>
+    </div>
+
+    <div>
+      <span class="lbl">Формат</span>
+      <div class="chips ratio" id="ratios"></div>
+    </div>
+
+    <div>
+      <span class="lbl">Сколько вариантов</span>
+      <div class="chips" id="counts"></div>
+    </div>
+
+    <div>
+      <div class="lbl"><span>Референс</span><button type="button" id="ref-clear" hidden>убрать</button></div>
+      <label class="drop" id="drop">
+        <input type="file" id="ref-file" accept="image/*" hidden>
+        <img id="ref-preview" alt="" hidden>
+        <span id="ref-text">Перетащи картинку или нажми, чтобы выбрать. Модель сделает вариацию или изменит её по промпту.</span>
+      </label>
+    </div>
+
+    <div>
+      <label class="lbl" for="seed">Seed</label>
+      <div class="seed">
+        <input type="number" id="seed" placeholder="случайный" min="0" step="1">
+        <button type="button" class="btn" id="seed-rand" title="Сбросить seed">↺</button>
+      </div>
+      <p class="hint">Один и тот же seed с тем же промптом даёт похожий результат, если модель это поддерживает.</p>
+    </div>
+
+    <button type="submit" class="btn go" id="go">Создать</button>
+    <p class="msg" id="msg" role="status"></p>
+  </form>
+
+  <section class="main">
+    <div class="bar"><h2>Галерея</h2><span id="count"></span></div>
+    <div class="grid" id="grid"></div>
+  </section>
+</div>
+
+<dialog id="lb">
+  <div class="lb">
+    <div class="lb-img"><img id="lb-img" alt=""></div>
+    <div class="lb-side">
+      <dl id="lb-meta"></dl>
+      <div class="lb-actions">
+        <a class="btn" id="lb-download" download>Скачать</a>
+        <button type="button" class="btn" id="lb-reuse">Повторить настройки</button>
+        <button type="button" class="btn" id="lb-ref">Как референс</button>
+        <button type="button" class="btn del" id="lb-del">Удалить</button>
+        <button type="button" class="btn" id="lb-close">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const STYLES = [
+  ['', 'Без стиля'],
+  ['photo', 'Фото', 'photorealistic photograph, natural light, 50mm lens, high detail'],
+  ['cinema', 'Кино', 'cinematic film still, anamorphic lens, dramatic lighting, color graded'],
+  ['anime', 'Аниме', 'anime illustration, clean line art, vibrant cel shading'],
+  ['3d', '3D', '3D render, octane, soft global illumination, studio lighting'],
+  ['art', 'Живопись', 'oil painting, visible brush strokes, rich textures'],
+  ['illu', 'Иллюстрация', 'editorial illustration, flat shapes, limited palette'],
+  ['pixel', 'Пиксель-арт', 'pixel art, 16-bit, crisp pixels, limited palette'],
+  ['minimal', 'Минимализм', 'minimalist composition, negative space, simple shapes'],
+];
+const RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2'];
+let models = [], items = [], reference = null, current = null;
+
+function chips(box, name, list, checked){
+  box.replaceChildren(...list.map(([v, label]) => {
+    const l = document.createElement('label'); l.className = 'chip';
+    const i = document.createElement('input'); i.type = 'radio'; i.name = name; i.value = v; i.checked = v === checked;
+    const s = document.createElement('span'); s.textContent = label;
+    l.append(i, s); return l;
+  }));
+}
+chips($('#styles'), 'style', STYLES, '');
+chips($('#ratios'), 'ratio', RATIOS.map(r => [r, r]), '1:1');
+chips($('#counts'), 'n', [['1','1'],['2','2'],['3','3'],['4','4']], '2');
+
+const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
+function setRadio(n, v){ document.querySelectorAll(`input[name=${n}]`).forEach(i => i.checked = i.value === v); }
+function say(t, err){ const m = $('#msg'); m.textContent = t; m.classList.toggle('err', !!err); }
+
+async function j(url, init){
+  const r = await fetch(url, init);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok && !(d.items && d.items.length)) throw new Error(d.error || (d.errors || []).join('\n') || 'Ошибка ' + r.status);
+  return d;
+}
+
+function price(m){
+  const p = m.pricing || {};
+  const v = p.image || p.per_image || p.request;
+  return v ? ' · ~$' + Number(v).toFixed(3) + ' за картинку' : '';
+}
+async function loadModels(){
+  try {
+    const d = await j('/api/models');
+    models = d.models || [];
+    const saved = localStorage.getItem('studio.model');
+    $('#model').replaceChildren(...models.map(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; return o; }));
+    if (saved && models.find(m => m.id === saved)) $('#model').value = saved;
+    showModel();
+  } catch (e) { say(e.message, true); }
+}
+function showModel(){
+  const m = models.find(x => x.id === $('#model').value);
+  $('#model-hint').textContent = m ? m.id + price(m) : '';
+  try { localStorage.setItem('studio.model', $('#model').value); } catch {}
+}
+$('#model').addEventListener('change', showModel);
+
+function tile(it){
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'tile';
+  const img = document.createElement('img'); img.loading = 'lazy'; img.src = '/output/' + it.file; img.alt = it.prompt;
+  const cap = document.createElement('span'); cap.className = 'cap'; cap.textContent = it.prompt;
+  b.append(img, cap); b.addEventListener('click', () => open(it)); return b;
+}
+function render(pending = 0){
+  const g = $('#grid');
+  const waits = Array.from({ length: pending }, () => { const d = document.createElement('div'); d.className = 'tile wait'; d.textContent = 'Рисую…'; return d; });
+  if (!items.length && !pending){
+    g.replaceChildren(Object.assign(document.createElement('div'), { className: 'empty', textContent: 'Здесь будут твои картинки. Напиши промпт слева и нажми «Создать».' }));
+  } else g.replaceChildren(...waits, ...items.map(tile));
+  const total = items.reduce((s, i) => s + (i.cost || 0), 0);
+  $('#count').textContent = items.length + ' шт.' + (total ? ' · потрачено $' + total.toFixed(2) : '');
+}
+async function loadGallery(){ try { items = (await j('/api/gallery')).items || []; render(); } catch (e) { say(e.message, true); } }
+
+async function toDataUrl(blob){
+  const img = await createImageBitmap(blob);
+  const max = 1536, k = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.92);
+}
+async function setReference(blob){
+  try {
+    reference = await toDataUrl(blob);
+    $('#ref-preview').src = reference; $('#ref-preview').hidden = false;
+    $('#ref-text').textContent = 'Референс добавлен. Модель возьмёт его за основу.';
+    $('#ref-clear').hidden = false;
+  } catch { say('Не получилось прочитать картинку.', true); }
+}
+function clearReference(){
+  reference = null; $('#ref-preview').hidden = true; $('#ref-clear').hidden = true; $('#ref-file').value = '';
+  $('#ref-text').textContent = 'Перетащи картинку или нажми, чтобы выбрать. Модель сделает вариацию или изменит её по промпту.';
+}
+$('#ref-file').addEventListener('change', e => e.target.files[0] && setReference(e.target.files[0]));
+$('#ref-clear').addEventListener('click', clearReference);
+const drop = $('#drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) setReference(f); });
+$('#seed-rand').addEventListener('click', () => $('#seed').value = '');
+
+$('#enhance').addEventListener('click', async () => {
+  const idea = $('#prompt').value.trim();
+  if (!idea){ say('Сначала напиши идею.', true); return; }
+  const b = $('#enhance'); b.disabled = true; say('Улучшаю промпт…');
+  try {
+    const d = await j('/api/enhance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idea, model: $('#model').value }) });
+    $('#prompt').value = d.prompt; say('Промпт улучшен. Можно поправить и создавать.');
+  } catch (e) { say(e.message, true); }
+  finally { b.disabled = false; }
+});
+
+$('#form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const prompt = $('#prompt').value.trim();
+  if (!prompt){ say('Напиши промпт.', true); $('#prompt').focus(); return; }
+  const style = STYLES.find(s => s[0] === radio('style')) || STYLES[0];
+  const n = Number(radio('n') || 1);
+  const seedVal = $('#seed').value === '' ? null : parseInt($('#seed').value, 10);
+  const body = { model: $('#model').value, prompt, negative: $('#negative').value.trim(), style: style[0], styleText: style[2] || '',
+    aspect_ratio: radio('ratio'), n, seed: Number.isInteger(seedVal) ? seedVal : null, reference };
+  $('#go').disabled = true; say('Создаю ' + n + '…'); render(n);
+  try {
+    const d = await j('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    items = [...d.items, ...items]; render();
+    const cost = d.items.reduce((s, i) => s + (i.cost || 0), 0);
+    say('Готово: ' + d.items.length + ' шт.' + (cost ? ' за $' + cost.toFixed(3) : '') + (d.errors && d.errors.length ? '\nНе получилось: ' + d.errors.join('\n') : ''), d.errors && d.errors.length);
+  } catch (err) { render(); say(err.message, true); }
+  finally { $('#go').disabled = false; }
+});
+
+function open(it){
+  current = it;
+  $('#lb-img').src = '/output/' + it.file; $('#lb-img').alt = it.prompt;
+  $('#lb-download').href = '/output/' + it.file; $('#lb-download').download = it.file;
+  const rows = [['Промпт', it.prompt], ['Модель', it.model], ['Стиль', (STYLES.find(s => s[0] === it.style) || STYLES[0])[1]],
+    ['Формат', it.aspect_ratio || '—'], ['Seed', it.seed ?? 'случайный'], ['Чего избегать', it.negative || '—'],
+    ['Референс', it.hadReference ? 'был' : 'нет'], ['Цена', it.cost != null ? '$' + it.cost.toFixed(4) : '—'],
+    ['Создано', new Date(it.createdAt).toLocaleString('ru-RU')]];
+  $('#lb-meta').replaceChildren(...rows.flatMap(([k, v]) => [Object.assign(document.createElement('dt'), { textContent: k }), Object.assign(document.createElement('dd'), { textContent: String(v) })]));
+  const del = $('#lb-del'); del.classList.remove('armed'); del.textContent = 'Удалить';
+  $('#lb').showModal();
+}
+$('#lb-close').addEventListener('click', () => $('#lb').close());
+$('#lb').addEventListener('click', e => { if (e.target === $('#lb')) $('#lb').close(); });
+$('#lb-reuse').addEventListener('click', () => {
+  const it = current; if (!it) return;
+  $('#prompt').value = it.prompt; $('#negative').value = it.negative || '';
+  if (models.find(m => m.id === it.model)) { $('#model').value = it.model; showModel(); }
+  setRadio('style', it.style || ''); if (it.aspect_ratio) setRadio('ratio', it.aspect_ratio);
+  $('#seed').value = it.seed ?? '';
+  $('#lb').close(); say('Настройки перенесены.');
+});
+$('#lb-ref').addEventListener('click', async () => {
+  const r = await fetch('/output/' + current.file); await setReference(await r.blob());
+  $('#lb').close(); say('Картинка стала референсом.');
+});
+$('#lb-del').addEventListener('click', async () => {
+  const b = $('#lb-del');
+  if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Точно удалить?'; return; }
+  try { await j('/api/gallery/' + current.id, { method: 'DELETE' }); items = items.filter(i => i.id !== current.id); render(); $('#lb').close(); }
+  catch (e) { say(e.message, true); }
+});
+
+(async () => {
+  try { const s = await j('/api/status'); $('#key-warn').hidden = s.hasKey; } catch {}
+  render(); loadModels(); loadGallery();
+})();
+</script>
+</body>
+</html>
