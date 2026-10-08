@@ -37,6 +37,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .chip span{display:inline-block;padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--raise);font-size:13px;cursor:pointer}
 .chip input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.mdesc{display:grid;gap:6px;margin-top:6px;font-size:13px}
+.mdesc p{margin:0;color:var(--ink)}
+.mdesc .tags{display:flex;gap:4px;flex-wrap:wrap}
+.mdesc .tag{font-size:11px;padding:1px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+.mdesc .facts{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.mdesc .warn{color:var(--warn)}
 .cost{margin:0;font-size:14px;padding:9px 11px;border-radius:8px;background:var(--raise);border:1px solid var(--line)}
 .cost b{font-family:var(--f-mono);font-weight:500;font-size:16px}
 .cost small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
@@ -107,6 +113,7 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
       <label class="lbl" for="model">Модель</label>
       <select id="model"><option>Загружаю список…</option></select>
       <p class="hint" id="model-hint"></p>
+      <div class="mdesc" id="model-desc"></div>
     </div>
 
     <div>
@@ -189,7 +196,7 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
       <div><div class="lbl"><label for="ed-size">Размер кисти</label><span class="val" id="ed-size-val"></span></div><input type="range" id="ed-size" min="5" max="250" value="60"></div>
       <div class="actions"><button type="button" class="btn" id="ed-clear">Очистить маску</button><button type="button" class="btn" id="ed-invert">Инвертировать</button></div>
       <div><label class="lbl" for="ed-text">Что сделать</label><textarea id="ed-text" rows="3" placeholder="Заменить куртку на красную кожаную; убрать человека; добавить шляпу"></textarea></div>
-      <div><label class="lbl" for="ed-model">Модель</label><select id="ed-model"></select><p class="hint">Лучше всего правят Gemini и Seedream.</p></div>
+      <div><label class="lbl" for="ed-model">Модель</label><select id="ed-model"></select><div class="mdesc" id="ed-mdesc"></div></div>
       <label class="check"><input type="checkbox" id="ed-keep" checked><span>Сохранить нетронутым всё вне маски: результат накладывается на оригинал только в закрашенной области, с мягким краем.</span></label>
       <p class="cost" id="ed-cost"></p>
       <button type="button" class="btn primary" id="ed-go">Применить</button>
@@ -210,7 +217,7 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
       <div><span class="lbl">Разрешение</span><div class="chips mono" id="up-res"></div></div>
       <div><div class="lbl"><label for="up-mix">Сила нового слоя</label><span class="val" id="up-mix-val"></span></div><input type="range" id="up-mix" min="0" max="100" value="80"><p class="hint">100% — только новая версия. Меньше — сквозь неё проступает оригинал, как слой с прозрачностью в фотошопе.</p></div>
       <div><label class="lbl" for="up-text">Подсказка (необязательно)</label><input type="text" id="up-text" placeholder="кожа естественная, без пластика"></div>
-      <div><label class="lbl" for="up-model">Модель</label><select id="up-model"></select><p class="hint">Для 4K лучше Seedream.</p></div>
+      <div><label class="lbl" for="up-model">Модель</label><select id="up-model"></select><div class="mdesc" id="up-mdesc"></div></div>
       <p class="cost" id="up-cost"></p>
       <button type="button" class="btn primary" id="up-go">Увеличить</button>
       <button type="button" class="btn" id="up-close">Отмена</button>
@@ -376,11 +383,30 @@ function fillSelect(sel, prefer, filter){
   const pick = prefer.map(p => list.find(m => m.id.includes(p))).find(Boolean);
   if (pick) sel.value = pick.id;
 }
+function describeModel(id, modelId){
+  const box = $('#' + id); const m = models.find(x => x.id === modelId);
+  if (!m){ box.replaceChildren(); return; }
+  const out = [];
+  const text = m.desc || m.desc_en;
+  if (text){ const p = document.createElement('p'); p.textContent = text; out.push(p); }
+  if (m.tags && m.tags.length){ const t = document.createElement('div'); t.className = 'tags'; m.tags.forEach(x => { const e = document.createElement('span'); e.className = 'tag'; e.textContent = x; t.append(e); }); out.push(t); }
+  if (known(m, 'refs')){
+    const f = [];
+    f.push(m.refs ? 'референсы: до ' + m.refs : 'референсов нет');
+    f.push(m.ratios && m.ratios.length ? 'форматов: ' + m.ratios.filter(r => r !== 'auto').length : 'формат не выбрать');
+    f.push(m.res && m.res.length ? 'разрешения: ' + m.res.join(', ') : 'разрешение не выбрать');
+    f.push(m.seed ? 'seed есть' : 'seed нет');
+    const e = document.createElement('div'); e.className = 'facts'; e.textContent = f.join(' · '); out.push(e);
+  }
+  if (m.needs_ref){ const w = document.createElement('div'); w.className = 'warn'; w.textContent = 'Нужен референс-образец стиля: добавь картинку и выбери роль «Стиль».'; out.push(w); }
+  box.replaceChildren(...out);
+}
+function describeAll(){ describeModel('model-desc', $('#model').value); describeModel('ed-mdesc', $('#ed-model').value); describeModel('up-mdesc', $('#up-model').value); }
 function fillModels(){
   let saved = null; try { saved = localStorage.getItem('studio.model'); } catch {}
   fillSelect($('#model'), [saved || 'flux-3', 'flux', 'nano-banana']);
-  fillSelect($('#ed-model'), ['nano-banana-2', 'gemini', 'seedream-5-0-pro'], m => !known(m, 'refs') || m.refs >= 2);
-  fillSelect($('#up-model'), ['seedream-5-0-pro', 'nano-banana-2', 'gemini'], m => !known(m, 'refs') || (m.refs >= 1 && (!known(m, 'res') || m.res.length)));
+  fillSelect($('#ed-model'), ['nano-banana-2', 'gemini', 'seedream-5-0-pro'], m => !m.needs_ref && (!known(m, 'refs') || m.refs >= 2));
+  fillSelect($('#up-model'), ['seedream-5-0-pro', 'nano-banana-2', 'gemini'], m => !m.needs_ref && (!known(m, 'refs') || (m.refs >= 1 && (!known(m, 'res') || m.res.length))));
   showModel();
 }
 function applyCaps(m){
@@ -404,11 +430,12 @@ function showModel(){
   $('#model-hint').textContent = m ? m.id + price(m) : '';
   try { localStorage.setItem('studio.model', $('#model').value); } catch {}
   applyCaps(m);
+  describeAll();
 }
 $('#model').addEventListener('change', showModel);
 $('#form').addEventListener('change', updateCost);
-$('#ed-model').addEventListener('change', updateCost);
-$('#up-model').addEventListener('change', updateCost);
+$('#ed-model').addEventListener('change', () => { updateCost(); describeAll(); });
+$('#up-model').addEventListener('change', () => { updateCost(); describeAll(); });
 $('#up-res').addEventListener('change', updateCost);
 
 /* ---------- references ---------- */
@@ -496,6 +523,8 @@ $('#form').addEventListener('submit', async e => {
   e.preventDefault();
   const prompt = $('#prompt').value.trim();
   if (!prompt){ say('Напиши промпт.', true); $('#prompt').focus(); return; }
+  const cur = models.find(x => x.id === $('#model').value);
+  if (cur && cur.needs_ref && !refs.length){ say('Этой модели нужен референс-образец стиля. Добавь картинку и выбери роль «Стиль».', true); return; }
   const style = STYLES.find(s => s[0] === radio('style')) || STYLES[0];
   const seedVal = $('#seed').value === '' ? null : parseInt($('#seed').value, 10);
   $('#go').disabled = true;

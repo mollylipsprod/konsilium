@@ -86,6 +86,7 @@ def _caps(m):
         'ratios': (sp.get('aspect_ratio') or {}).get('values') or [],
         'seed': 'seed' in sp,
         'nmax': rng('n') or 1,
+        'desc_en': (m.get('description') or '').strip()[:300],
     }
 
 
@@ -192,8 +193,11 @@ def cmd_models(_):
     caps = [_caps(m) for m in _list_models()]
     with ThreadPoolExecutor(8) as ex:
         prices = list(ex.map(lambda c: _price(c['id']), caps))
+    notes_file = ROOT / 'studio' / 'model-notes.json'
+    notes = json.loads(notes_file.read_text(encoding='utf-8')) if notes_file.exists() else {}
     for c, p in zip(caps, prices):
         c['price'] = p
+        c.update(notes.get(c['id'], {}))  # desc, tags, needs_ref по-русски; для новых моделей остаётся desc_en
     print(json.dumps(caps, ensure_ascii=False))
 
 
