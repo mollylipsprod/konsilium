@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Спросить любую модель OpenRouter: второе мнение, ревью кода, ответ для дебатов.
 
-Ключ берётся из OPENROUTER_API_KEY (переменная окружения или .env в корне репозитория).
+Ключ берётся из OPENROUTER_API_KEY (переменная окружения или .env). В облачной среде его может
+подставлять прокси (Network secret), тогда ключ в сессии не нужен.
 
   python3 scripts/ask.py --model moonshotai/kimi-k3 --file app.py "Найди ошибки"
   git diff | python3 scripts/ask.py --model moonshotai/kimi-k3 --stdin "Проверь эти изменения"
   python3 scripts/ask.py --list qwen          # найти точные id моделей
+  python3 scripts/ask.py --check              # проверить, что ключ работает
 """
 import argparse, json, os, ssl, sys, urllib.error, urllib.request
 from pathlib import Path
@@ -23,13 +25,14 @@ def load_env():
 
 
 def api(path, body=None):
+    # Ключ необязателен: в облачной среде его может подставить прокси (Network secret),
+    # тогда в самой сессии ключа нет, и это нормально.
     key = os.environ.get('OPENROUTER_API_KEY')
-    if not key:
-        sys.exit('Нет OPENROUTER_API_KEY: добавь его в .env в корне репозитория.')
     base = os.environ.get('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1').rstrip('/')
-    req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None,
-                                 headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json',
-                                          'X-Title': 'Konsilium'})
+    headers = {'Content-Type': 'application/json', 'X-Title': 'Konsilium'}
+    if key:
+        headers['Authorization'] = f'Bearer {key}'
+    req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None, headers=headers)
     ctx = ssl.create_default_context(cafile=os.environ.get('SSL_CERT_FILE') or None)
     try:
         with urllib.request.urlopen(req, timeout=600, context=ctx) as r:
@@ -40,6 +43,8 @@ def api(path, body=None):
             text = json.loads(text).get('error', {}).get('message', text)
         except Exception:
             pass
+        if e.code in (401, 403):
+            sys.exit('Ключ не принят. Добавь его как Network secret для openrouter.ai в облачной среде (или OPENROUTER_API_KEY в переменные среды / .env).')
         sys.exit(f'OpenRouter ответил {e.code}: {text[:300]}')
 
 
@@ -51,9 +56,20 @@ def main():
     p.add_argument('--system', default='', help='роль и правила для модели')
     p.add_argument('--file', action='append', default=[], help='приложить файл (можно несколько раз)')
     p.add_argument('--stdin', action='store_true', help='приложить то, что пришло на вход (например git diff)')
+    p.add_argument('--check', action='store_true', help='проверить ключ и показать остаток лимита')
     p.add_argument('--list', metavar='ПОИСК', help='показать id моделей, в названии которых есть ПОИСК')
     p.add_argument('--json', action='store_true', help='вывести ответ, модель и цену в JSON')
     a = p.parse_args()
+
+    if a.check:
+        try:
+            d = api('/key')
+        except SystemExit:
+            d = api('/auth/key')
+        d = d.get('data', d)
+        print(json.dumps({'ok': True, 'label': d.get('label'), 'usage': d.get('usage'), 'limit': d.get('limit'),
+                          'limit_remaining': d.get('limit_remaining')}, ensure_ascii=False))
+        return
 
     if a.list is not None:
         for m in api('/models').get('data', []):

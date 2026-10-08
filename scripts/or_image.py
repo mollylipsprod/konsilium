@@ -3,7 +3,8 @@
 
 Claude запускает этот скрипт, когда пользователь пишет «го»: берёт задания из
 хранилища страницы, скачивает исходники, вызывает модель и кладёт результат
-обратно. Ключ берётся из OPENROUTER_API_KEY (переменная окружения или .env).
+обратно. Ключ берётся из OPENROUTER_API_KEY (переменная окружения или .env) либо подставляется
+прокси облачной среды (Network secret).
 
   python3 scripts/or_image.py models
   python3 scripts/or_image.py generate --model M --prompt P [--ref file:role ...] --n 2 --out out/gen
@@ -45,13 +46,13 @@ def load_env():
 
 
 def api(path, body=None):
+    # Ключ необязателен: в облачной среде его может подставить прокси (Network secret).
     key = os.environ.get('OPENROUTER_API_KEY')
-    if not key:
-        sys.exit('Нет OPENROUTER_API_KEY: добавь его в переменные окружения среды или в .env')
     base = os.environ.get('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1').rstrip('/')
-    req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None,
-                                 headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json',
-                                          'X-Title': 'Konsilium Studio'})
+    headers = {'Content-Type': 'application/json', 'X-Title': 'Konsilium Studio'}
+    if key:
+        headers['Authorization'] = f'Bearer {key}'
+    req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None, headers=headers)
     ctx = ssl.create_default_context(cafile=os.environ.get('SSL_CERT_FILE') or None)
     try:
         with urllib.request.urlopen(req, timeout=300, context=ctx) as r:
@@ -62,6 +63,8 @@ def api(path, body=None):
             text = json.loads(text).get('error', {}).get('message', text)
         except Exception:
             pass
+        if e.code in (401, 403):
+            raise RuntimeError('Ключ не принят. Добавь его как Network secret для openrouter.ai в облачной среде (или OPENROUTER_API_KEY в переменные среды / .env).')
         raise RuntimeError(f'OpenRouter ответил {e.code}: {text[:300]}')
 
 

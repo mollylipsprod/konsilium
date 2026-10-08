@@ -6,7 +6,7 @@ description: Выполнение заданий из студии картин�
 # Студия картинок
 
 Страница: https://claude.ai/artifact/DTkbUbNBy2vGKH7LhtfPyh (исходник `studio/panel.html`).
-Движок: `scripts/or_image.py`. Нужны `OPENROUTER_API_KEY` (переменная окружения среды или `.env`), доступ к `openrouter.ai` и Pillow (`pip install pillow`, если не установлен).
+Движок: `scripts/or_image.py`. Ключ OpenRouter подставляет прокси облачной среды (Network secret) либо он лежит в `OPENROUTER_API_KEY` / `.env`; проверка: `python3 scripts/ask.py --check`. Нужен доступ к `openrouter.ai` и Pillow (`pip install pillow`, если не установлен).
 
 ## Хранилище страницы
 

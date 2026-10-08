@@ -13,11 +13,13 @@
 - **Беседы и покупки:** [пульт Консилиума](https://claude.ai/artifact/JtbDavitxLLq12xCLXEeAt).
 - **Картинки:** [Студия](https://claude.ai/artifact/DTkbUbNBy2vGKH7LhtfPyh). Промпт, референсы с ролями (поза, композиция, стиль, лицо), правка по маске кистью, художественное увеличение со смешиванием слоёв. Генерирует Claude через OpenRouter.
 
-Один раз настроить облачную среду. На claude.ai/code нажми кнопку-облако с названием среды над полем сообщения, наведи на свою среду и нажми шестерёнку («Edit environment»):
-1. **Network access:** выбери **Custom**, в поле **Allowed domains** впиши `openrouter.ai` (отдельной строкой) и оставь галочку «Also include default list of common package managers». Это действует на текущие сессии примерно через минуту.
-2. **Environment variables:** добавь строку `OPENROUTER_API_KEY=твой_ключ` и нажми **Save changes**. Ключ подхватит новая сессия. В чат ключ не присылать.
+Один раз настроить облачную среду. На claude.ai/code нажми кнопку-облако с названием среды над полем сообщения, наведи на свою среду и нажми шестерёнку («Edit environment»).
 
-На тарифах Pro и Max есть более защищённый вариант: раздел **Network secrets**, где ключ вообще не попадает внутрь сессии.
+**Основной способ, тарифы Pro и Max: Network secrets.** Ключ хранится в Anthropic, внутрь сессии не попадает, прокси подставляет его только в запросы к `openrouter.ai`. Раздел **Network secrets** → **Add secret**: Name `OpenRouter`, Allowed websites `openrouter.ai`, Custom headers: Name `Authorization`, Prefix `Bearer`, Value твой ключ → **Connect**. Сохраняется сразу, работает во всех сессиях этой среды, добавлять домен в Network access не нужно. Ключ потом посмотреть нельзя, поменять можно только удалив и добавив заново.
+
+**Запасной способ, любые тарифы:** в **Environment variables** добавить `OPENROUTER_API_KEY=твой_ключ` и **Save changes**, а в **Network access** выбрать **Custom** и добавить `openrouter.ai` в **Allowed domains**. Минус: ключ могут прочитать команды внутри сессии.
+
+В чат ключ не присылать. Проверка: `python3 scripts/ask.py --check`.
 
 ## Дополнительно: запуск на своём компьютере (необязательно)
 
