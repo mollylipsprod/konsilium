@@ -5,3 +5,5 @@ secrets*
 .playwright-mcp/
 studio/output/
 !.env.example
+__pycache__/
+*.pyc
