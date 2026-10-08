@@ -68,12 +68,85 @@ def api(path, body=None):
         raise RuntimeError(f'OpenRouter ответил {e.code}: {text[:300]}')
 
 
+RES_ORDER = ['512', '768', '1K', '1.5K', '2K', '4K']
+
+
+def _list_models():
+    res = api('/images/models')
+    return res if isinstance(res, list) else res.get('data', [])
+
+
+def _caps(m):
+    sp = m.get('supported_parameters') or {}
+    rng = lambda k: (sp.get(k) or {}).get('max') if (sp.get(k) or {}).get('type') == 'range' else None
+    return {
+        'id': m['id'], 'name': m.get('name') or m['id'],
+        'refs': rng('input_references') or 0,
+        'res': (sp.get('resolution') or {}).get('values') or [],
+        'ratios': (sp.get('aspect_ratio') or {}).get('values') or [],
+        'seed': 'seed' in sp,
+        'nmax': rng('n') or 1,
+    }
+
+
+def _ratio_value(r):
+    try:
+        a, b = r.split(':'); return float(a) / float(b)
+    except Exception:
+        return None
+
+
+def fit(model, aspect, resolution, seed, n_refs):
+    """Подгоняет запрос под возможности модели. Возвращает (aspect, resolution, seed, заметки)."""
+    caps = next((_caps(m) for m in _list_models() if m['id'] == model), None)
+    if caps is None:
+        raise RuntimeError(f'Модели {model} нет в списке OpenRouter. Список: python3 scripts/or_image.py models')
+    notes = []
+    if n_refs and caps['refs'] == 0:
+        raise RuntimeError(f'Модель {model} не принимает референсы. Выбери другую: python3 scripts/or_image.py models')
+    if n_refs > caps['refs'] > 0:
+        raise RuntimeError(f'Модель {model} принимает не больше {caps["refs"]} референсов, а нужно {n_refs}.')
+    if aspect:
+        ok = [r for r in caps['ratios'] if _ratio_value(r)]
+        if not ok:
+            aspect = None; notes.append('модель не поддерживает выбор формата кадра')
+        elif aspect not in ok:
+            want = _ratio_value(aspect)
+            new = min(ok, key=lambda r: abs(__import__('math').log(_ratio_value(r) / want)))
+            notes.append(f'формат {aspect} недоступен, взят {new}'); aspect = new
+    if resolution:
+        if not caps['res']:
+            resolution = None; notes.append('модель не поддерживает выбор разрешения')
+        elif resolution not in caps['res']:
+            known = [r for r in RES_ORDER if r in caps['res']] or caps['res']
+            new = known[-1] if RES_ORDER.index(resolution) > RES_ORDER.index(known[-1]) else known[0]
+            notes.append(f'разрешение {resolution} недоступно, взято {new}'); resolution = new
+    if seed is not None and not caps['seed']:
+        seed = None; notes.append('модель не поддерживает seed')
+    return aspect, resolution, seed, notes
+
+
+def _price(model_id):
+    try:
+        eps = api(f'/images/models/{model_id}/endpoints').get('endpoints') or []
+        out = {}
+        for p in (eps[0].get('pricing') or []) if eps else []:
+            if p.get('billable') == 'output_image' and p.get('unit') == 'image':
+                out['image'] = min(out.get('image', 9), p['cost_usd'])
+            elif p.get('billable') == 'output_image' and p.get('unit') == 'token':
+                out['token'] = p['cost_usd']
+        return out or None
+    except Exception:
+        return None
+
+
 def data_url(path):
     mime = mimetypes.guess_type(str(path))[0] or 'image/png'
     return f'data:{mime};base64,' + base64.b64encode(Path(path).read_bytes()).decode()
 
 
 def call_image(model, prompt, refs=(), aspect=None, resolution=None, seed=None):
+    aspect, resolution, seed, notes = fit(model, aspect, resolution, seed, len(refs))
     body = {'model': model, 'prompt': prompt}
     if aspect: body['aspect_ratio'] = aspect
     if resolution: body['resolution'] = resolution
@@ -89,6 +162,7 @@ def call_image(model, prompt, refs=(), aspect=None, resolution=None, seed=None):
     else:
         raise RuntimeError('Модель не вернула картинку.')
     cost = (res.get('usage') or {}).get('cost')
+    call_image.notes = notes
     return raw, cost if isinstance(cost, (int, float)) else None
 
 
@@ -102,9 +176,12 @@ def save_png(raw_or_img, out):
 
 
 def cmd_models(_):
-    res = api('/images/models')
-    raw = res if isinstance(res, list) else res.get('data', [])
-    print(json.dumps([{'id': m['id'], 'name': m.get('name') or m['id'], 'pricing': m.get('pricing')} for m in raw if m.get('id')], ensure_ascii=False))
+    caps = [_caps(m) for m in _list_models()]
+    with ThreadPoolExecutor(8) as ex:
+        prices = list(ex.map(lambda c: _price(c['id']), caps))
+    for c, p in zip(caps, prices):
+        c['price'] = p
+    print(json.dumps(caps, ensure_ascii=False))
 
 
 def cmd_generate(a):
@@ -123,7 +200,7 @@ def cmd_generate(a):
             raw, cost = call_image(a.model, prompt, refs, a.aspect, a.resolution, None if a.seed is None else a.seed + i)
             out = f'{a.out}-{i + 1}.png'
             w, h = save_png(raw, out)
-            return {'file': out, 'cost': cost, 'width': w, 'height': h, 'seed': None if a.seed is None else a.seed + i}
+            return {'file': out, 'cost': cost, 'width': w, 'height': h, 'seed': None if a.seed is None else a.seed + i, 'adjusted': getattr(call_image, 'notes', [])}
         except Exception as e:
             return {'error': str(e)}
     with ThreadPoolExecutor(4) as ex:
@@ -144,7 +221,7 @@ def cmd_edit(a):
         res = Image.composite(res, src, mask)
         note = 'наложено на оригинал по маске'
     w, h = save_png(res, a.out)
-    print(json.dumps({'file': a.out, 'cost': cost, 'width': w, 'height': h, 'note': note}, ensure_ascii=False))
+    print(json.dumps({'file': a.out, 'cost': cost, 'width': w, 'height': h, 'note': note, 'adjusted': getattr(call_image, 'notes', [])}, ensure_ascii=False))
 
 
 def cmd_upscale(a):
@@ -159,7 +236,7 @@ def cmd_upscale(a):
         res = Image.blend(src, res, a.mix / 100)
         note = f'новый слой {a.mix}% поверх оригинала'
     w, h = save_png(res, a.out)
-    print(json.dumps({'file': a.out, 'cost': cost, 'width': w, 'height': h, 'note': note}, ensure_ascii=False))
+    print(json.dumps({'file': a.out, 'cost': cost, 'width': w, 'height': h, 'note': note, 'adjusted': getattr(call_image, 'notes', [])}, ensure_ascii=False))
 
 
 def main():

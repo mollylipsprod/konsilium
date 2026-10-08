@@ -37,6 +37,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .chip span{display:inline-block;padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--raise);font-size:13px;cursor:pointer}
 .chip input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.chip.off{opacity:.35}.chip.off span,.chip.off input{cursor:not-allowed}
 .mono span{font-family:var(--f-mono);font-size:12px}
 .refs{display:grid;gap:8px}
 .ref{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:6px}
@@ -225,13 +226,13 @@ const STYLES = [
   ['minimal', 'Минимализм', 'minimalist composition, negative space, simple shapes'],
 ];
 const ROLES = [['base','Основа для правки'],['pose','Поза'],['composition','Композиция'],['style','Стиль'],['character','Лицо / персонаж'],['object','Предмет']];
-const RATIOS = ['1:1','3:4','4:3','9:16','16:9','2:3','3:2','21:9'];
+const RATIOS = ['1:1','3:4','4:3','9:16','16:9','2:3','3:2','4:5','5:4','21:9'];
 const LEVELS = [['1','Бережно','Только резкость и мелкие детали, ничего не меняет.'],['2','Умеренно','Богаче текстуры и свет, лица и цвета на месте.'],['3','Творчески','Сильная перерисовка с новыми деталями, как у Magnific.']];
 const FALLBACK_MODELS = [
-  { id: 'black-forest-labs/flux.2-pro', name: 'FLUX.2 Pro' },
-  { id: 'black-forest-labs/flux.2-flex', name: 'FLUX.2 Flex' },
-  { id: 'google/gemini-3.1-flash-image', name: 'Gemini Flash Image (Nano Banana)' },
-  { id: 'bytedance-seed/seedream-4.5', name: 'Seedream 4.5' },
+  { id: 'black-forest-labs/flux-3-image', name: 'FLUX 3' },
+  { id: 'google/gemini-nano-banana-2.1', name: 'Nano Banana 2.1' },
+  { id: 'bytedance-seed/seedream-5-0-pro', name: 'Seedream 5 Pro' },
+  { id: 'openai/gpt-image-2', name: 'GPT Image 2' },
 ];
 const KIND = { edit: 'маска', upscale: 'увеличено', upload: 'фото' };
 const JOB_STATUS = { sent: 'ждёт «го»', working: 'Claude рисует…', error: 'ошибка' };
@@ -280,7 +281,7 @@ async function addJob(data){
 /* ---------- controls ---------- */
 chips($('#styles'), 'style', STYLES, '');
 chips($('#ratios'), 'ratio', RATIOS.map(r => [r, r]), '1:1');
-chips($('#res'), 'res', [['1K','1K'],['2K','2K'],['4K','4K']], '1K');
+chips($('#res'), 'res', [['512','512'],['768','768'],['1K','1K'],['1.5K','1.5K'],['2K','2K'],['4K','4K']], '1K');
 chips($('#counts'), 'n', [['1','1'],['2','2'],['3','3'],['4','4']], '2');
 chips($('#ed-tool'), 'tool', [['brush','Кисть'],['erase','Ластик']], 'brush');
 chips($('#up-level'), 'level', LEVELS.map(l => [l[0], l[1]]), '2');
@@ -292,31 +293,56 @@ $('#ed-size').addEventListener('input', () => $('#ed-size-val').textContent = $(
 $('#seed-rand').addEventListener('click', () => $('#seed').value = '');
 
 /* ---------- models ---------- */
-function price(m){ const p = m.pricing || {}; const v = p.image || p.per_image || p.request; return v ? ' · ~$' + Number(v).toFixed(3) + ' за картинку' : ''; }
-function fillSelect(sel, prefer){
+function price(m){
+  const p = m.price || {};
+  if (p.image) return ' · ~$' + Number(p.image).toFixed(3) + ' за картинку';
+  if (p.token) return ' · оплата по токенам, итог виден после генерации';
+  return '';
+}
+// Если данных о возможностях модели нет (запасной список), разрешено всё.
+const known = (m, k) => m && m[k] !== undefined;
+function fillSelect(sel, prefer, filter){
   const keep = sel.value;
-  sel.replaceChildren(...models.map(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name || m.id; return o; }));
-  if (keep && models.find(m => m.id === keep)) { sel.value = keep; return; }
-  const pick = prefer.map(p => models.find(m => m.id.includes(p))).find(Boolean);
+  const list = filter ? models.filter(filter) : models;
+  sel.replaceChildren(...list.map(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name || m.id; return o; }));
+  if (keep && list.find(m => m.id === keep)) { sel.value = keep; return; }
+  const pick = prefer.map(p => list.find(m => m.id.includes(p))).find(Boolean);
   if (pick) sel.value = pick.id;
 }
 function fillModels(){
   let saved = null; try { saved = localStorage.getItem('studio.model'); } catch {}
-  fillSelect($('#model'), [saved || 'flux.2-pro', 'flux']);
-  fillSelect($('#ed-model'), ['gemini', 'seedream']);
-  fillSelect($('#up-model'), ['seedream', 'gemini']);
+  fillSelect($('#model'), [saved || 'flux-3', 'flux', 'nano-banana']);
+  fillSelect($('#ed-model'), ['nano-banana-2', 'gemini', 'seedream-5-0-pro'], m => !known(m, 'refs') || m.refs >= 2);
+  fillSelect($('#up-model'), ['seedream-5-0-pro', 'nano-banana-2', 'gemini'], m => !known(m, 'refs') || (m.refs >= 1 && (!known(m, 'res') || m.res.length)));
   showModel();
 }
+function applyCaps(m){
+  const set = (name, allowed, dflt) => {
+    const inputs = [...document.querySelectorAll(`input[name="${name}"]`)];
+    inputs.forEach(i => { const ok = !allowed || allowed.includes(i.value); i.disabled = !ok; i.closest('.chip').classList.toggle('off', !ok); });
+    const cur = inputs.find(i => i.checked);
+    if (cur && cur.disabled) cur.checked = false;
+    if (!inputs.some(i => i.checked)){ const pick = inputs.find(i => !i.disabled && i.value === dflt) || inputs.find(i => !i.disabled); if (pick) pick.checked = true; }
+  };
+  set('ratio', known(m, 'ratios') ? m.ratios : null, '1:1');
+  set('res', known(m, 'res') ? m.res : null, '1K');
+  $('#seed').disabled = known(m, 'seed') && !m.seed;
+  $('#seed').placeholder = $('#seed').disabled ? 'эта модель не поддерживает' : 'случайный';
+  renderRefs();
+}
+function maxRefs(){ const m = models.find(x => x.id === $('#model').value); return Math.min(6, known(m, 'refs') ? m.refs : 6); }
 function showModel(){
   const m = models.find(x => x.id === $('#model').value);
   $('#model-hint').textContent = m ? m.id + price(m) : '';
   try { localStorage.setItem('studio.model', $('#model').value); } catch {}
+  applyCaps(m);
 }
 $('#model').addEventListener('change', showModel);
 
 /* ---------- references ---------- */
 function renderRefs(){
-  $('#ref-count').textContent = refs.length ? refs.length + ' из 6' : '';
+  const cap = maxRefs();
+  $('#ref-count').textContent = cap === 0 ? 'модель не принимает референсы' : (refs.length ? refs.length + ' из ' + cap : 'до ' + cap);
   $('#refs').replaceChildren(...refs.map((r, i) => {
     const row = document.createElement('div'); row.className = 'ref';
     const img = document.createElement('img'); img.src = blobUrl(r.asset); img.alt = 'Референс ' + (i + 1);
@@ -329,7 +355,8 @@ function renderRefs(){
   }));
 }
 async function addRefFile(file){
-  if (refs.length >= 6){ say('Не больше 6 референсов.', true); return; }
+  if (maxRefs() === 0){ say('Эта модель не принимает референсы. Выбери другую.', true); return; }
+  if (refs.length >= maxRefs()){ say('Эта модель принимает не больше ' + maxRefs() + ' референсов.', true); return; }
   say('Загружаю референс…');
   try { const s = await shrink(file, 1536); refs.push({ asset: await upload(s.blob), role: refs.length ? 'style' : 'base' }); renderRefs(); say(''); }
   catch (e) { say(e.message, true); }
@@ -429,7 +456,8 @@ $('#lb-reuse').addEventListener('click', () => {
   $('#seed').value = it.seed ?? ''; $('#lb').close(); say('Настройки перенесены.');
 });
 $('#lb-ref').addEventListener('click', () => {
-  if (refs.length >= 6){ say('Не больше 6 референсов.', true); return; }
+  if (maxRefs() === 0){ say('Эта модель не принимает референсы. Выбери другую.', true); return; }
+  if (refs.length >= maxRefs()){ say('Эта модель принимает не больше ' + maxRefs() + ' референсов.', true); return; }
   refs.push({ asset: current.asset, role: refs.length ? 'style' : 'base' }); renderRefs();
   $('#lb').close(); say('Картинка добавлена в референсы. Выбери ей роль.');
 });

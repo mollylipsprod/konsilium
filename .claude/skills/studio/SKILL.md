@@ -15,7 +15,8 @@ description: Выполнение заданий из студии картин�
   - edit: `source` (asset), `mask` (asset, белое = менять), `keep` (наложить результат на оригинал только по маске).
   - upscale: `source` (asset), `creativity` (1–3), `resolution`, `mix` (0–100, сила нового слоя).
 - `images/<id>`: галерея, пишу я. Поля: `asset`, `kind` (generate | edit | upscale | upload), `parent` (asset исходника), `model`, `prompt`, `negative`, `style`, `aspect_ratio`, `resolution`, `seed`, `roles`, `cost`, `width`, `height`, `note`, `createdAt`.
-- `config/models`: `{list: [{id, name, pricing}]}` — список моделей для выпадающих списков. Обновлять выводом `or_image.py models`, если список пуст или устарел.
+- `config/models`: `{list: [{id, name, refs, res, ratios, seed, nmax, price}], updatedAt}` — каталог моделей с их возможностями и ценой, из него страница строит выпадающие списки и отключает недоступные форматы и разрешения. Обновить: `python3 scripts/or_image.py models > каталог.json`, затем записать `{list: <каталог>, updatedAt}` документом `config/models` (ArtifactData `set`, `file_path`). Обновлять, если пользователь просит новые модели или раз в пару недель.
+- Движок сам подгоняет запрос под модель (формат, разрешение, seed) и пишет, что изменил, в поле `adjusted` вывода; об этом нужно сказать пользователю.
 - Картинки лежат в assets страницы, на странице показываются как `/_blob/<asset>`.
 
 ## Когда пользователь пишет «го»
