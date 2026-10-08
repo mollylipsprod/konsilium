@@ -155,8 +155,23 @@ def _price(model_id):
 
 
 def data_url(path):
+    # Некоторые провайдеры (например, Seedream) не принимают PNG в input_references,
+    # поэтому всё, что не JPEG, перекодируем в JPEG.
     mime = mimetypes.guess_type(str(path))[0] or 'image/png'
-    return f'data:{mime};base64,' + base64.b64encode(Path(path).read_bytes()).decode()
+    raw = Path(path).read_bytes()
+    if mime != 'image/jpeg':
+        try:
+            from PIL import Image
+            im = Image.open(io.BytesIO(raw))
+            if im.mode in ('RGBA', 'LA', 'P'):
+                bg = Image.new('RGB', im.size, (255, 255, 255))
+                bg.paste(im.convert('RGBA'), mask=im.convert('RGBA').split()[-1])
+                im = bg
+            buf = io.BytesIO(); im.convert('RGB').save(buf, 'JPEG', quality=95)
+            raw, mime = buf.getvalue(), 'image/jpeg'
+        except Exception:
+            pass
+    return f'data:{mime};base64,' + base64.b64encode(raw).decode()
 
 
 def call_image(model, prompt, refs=(), aspect=None, resolution=None, seed=None):
