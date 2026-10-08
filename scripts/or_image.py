@@ -180,6 +180,11 @@ def call_image(model, prompt, refs=(), aspect=None, resolution=None, seed=None):
     return raw, cost if isinstance(cost, (int, float)) else None
 
 
+def is_svg(raw):
+    head = raw[:400].lstrip().lower()
+    return head.startswith(b'<svg') or (head.startswith(b'<?xml') and b'<svg' in raw[:2000].lower())
+
+
 def save_png(raw_or_img, out):
     from PIL import Image
     img = raw_or_img if hasattr(raw_or_img, 'save') else Image.open(io.BytesIO(raw_or_img))
@@ -215,6 +220,12 @@ def cmd_generate(a):
     def one(i):
         try:
             raw, cost = call_image(a.model, prompt, refs, a.aspect, a.resolution, None if a.seed is None else a.seed + i)
+            if is_svg(raw):  # векторные модели возвращают SVG, его сохраняем как есть
+                out = f'{a.out}-{i + 1}.svg'
+                Path(out).parent.mkdir(parents=True, exist_ok=True)
+                Path(out).write_bytes(raw)
+                return {'file': out, 'cost': cost, 'width': None, 'height': None, 'format': 'svg',
+                        'seed': None if a.seed is None else a.seed + i, 'adjusted': getattr(call_image, 'notes', [])}
             out = f'{a.out}-{i + 1}.png'
             w, h = save_png(raw, out)
             return {'file': out, 'cost': cost, 'width': w, 'height': h, 'seed': None if a.seed is None else a.seed + i, 'adjusted': getattr(call_image, 'notes', [])}
