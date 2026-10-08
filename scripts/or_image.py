@@ -127,17 +127,30 @@ def fit(model, aspect, resolution, seed, n_refs):
 
 
 def _price(model_id):
+    """Цены модели: variants (цена за выходную картинку по разрешению), token_out (за токен),
+    in_image (за входную картинку-референс). Если у провайдеров цены разные, берётся наибольшая."""
     try:
         eps = api(f'/images/models/{model_id}/endpoints').get('endpoints') or []
-        out = {}
-        for p in (eps[0].get('pricing') or []) if eps else []:
-            if p.get('billable') == 'output_image' and p.get('unit') == 'image':
-                out['image'] = min(out.get('image', 9), p['cost_usd'])
-            elif p.get('billable') == 'output_image' and p.get('unit') == 'token':
-                out['token'] = p['cost_usd']
-        return out or None
     except Exception:
         return None
+    out = {}
+    def put(path, value):
+        d = out
+        for k in path[:-1]:
+            d = d.setdefault(k, {})
+        d[path[-1]] = max(value, d.get(path[-1], 0))
+    for ep in eps:
+        for p in ep.get('pricing') or []:
+            b, u, c, v = p.get('billable'), p.get('unit'), p.get('cost_usd'), p.get('variant')
+            if c is None:
+                continue
+            if b == 'output_image' and u == 'image':
+                put(['variants', (v or 'base').lower()], c)
+            elif b == 'output_image' and u == 'token':
+                put(['token_out'], c)
+            elif b == 'input_image' and u == 'image':
+                put(['in_image'], c)
+    return out or None
 
 
 def data_url(path):

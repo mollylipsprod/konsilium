@@ -37,6 +37,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .chip span{display:inline-block;padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--raise);font-size:13px;cursor:pointer}
 .chip input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.cost{margin:0;font-size:14px;padding:9px 11px;border-radius:8px;background:var(--raise);border:1px solid var(--line)}
+.cost b{font-family:var(--f-mono);font-weight:500;font-size:16px}
+.cost small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.cost.high{border-color:var(--warn)}.cost.high b{color:var(--warn)}
 .chip.off{opacity:.35}.chip.off span,.chip.off input{cursor:not-allowed}
 .mono span{font-family:var(--f-mono);font-size:12px}
 .refs{display:grid;gap:8px}
@@ -139,6 +143,7 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
       </div>
     </div>
 
+    <p class="cost" id="cost"></p>
     <button type="submit" class="btn primary go" id="go">В очередь</button>
     <p class="msg" id="msg" role="status"></p>
   </form>
@@ -186,6 +191,7 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
       <div><label class="lbl" for="ed-text">Что сделать</label><textarea id="ed-text" rows="3" placeholder="Заменить куртку на красную кожаную; убрать человека; добавить шляпу"></textarea></div>
       <div><label class="lbl" for="ed-model">Модель</label><select id="ed-model"></select><p class="hint">Лучше всего правят Gemini и Seedream.</p></div>
       <label class="check"><input type="checkbox" id="ed-keep" checked><span>Сохранить нетронутым всё вне маски: результат накладывается на оригинал только в закрашенной области, с мягким краем.</span></label>
+      <p class="cost" id="ed-cost"></p>
       <button type="button" class="btn primary" id="ed-go">Применить</button>
       <button type="button" class="btn" id="ed-close">Отмена</button>
       <p class="msg" id="ed-msg" role="status"></p>
@@ -205,6 +211,7 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
       <div><div class="lbl"><label for="up-mix">Сила нового слоя</label><span class="val" id="up-mix-val"></span></div><input type="range" id="up-mix" min="0" max="100" value="80"><p class="hint">100% — только новая версия. Меньше — сквозь неё проступает оригинал, как слой с прозрачностью в фотошопе.</p></div>
       <div><label class="lbl" for="up-text">Подсказка (необязательно)</label><input type="text" id="up-text" placeholder="кожа естественная, без пластика"></div>
       <div><label class="lbl" for="up-model">Модель</label><select id="up-model"></select><p class="hint">Для 4K лучше Seedream.</p></div>
+      <p class="cost" id="up-cost"></p>
       <button type="button" class="btn primary" id="up-go">Увеличить</button>
       <button type="button" class="btn" id="up-close">Отмена</button>
       <p class="msg" id="up-msg" role="status"></p>
@@ -293,10 +300,70 @@ $('#ed-size').addEventListener('input', () => $('#ed-size-val').textContent = $(
 $('#seed-rand').addEventListener('click', () => $('#seed').value = '');
 
 /* ---------- models ---------- */
+const money = x => '$' + (x < 0.1 ? x.toFixed(3) : x.toFixed(2));
+const RES_TOKENS = { '512': .7, '768': .8, '1k': 1, '1.5k': 1.25, '2k': 1.5, '4k': 2.3 };
+// Цена одной выходной картинки: {lo, hi, approx, tokens}. Для неясных случаев hi берётся с запасом.
+function outCost(m, res){
+  const p = m.price || {};
+  const key = (res || '').toLowerCase();
+  if (p.variants){
+    const v = p.variants;
+    if (key && v[key] != null) return { lo: v[key], hi: v[key] };
+    if (v.base != null && v.high_resolution != null){
+      if (!key || key === '1k') return { lo: v.base, hi: v.base };
+      return { lo: v.base, hi: v.high_resolution, approx: true };
+    }
+    const vals = Object.values(v);
+    if (!key){ const d = v.base ?? v['1k'] ?? Math.min(...vals); return { lo: d, hi: d, approx: v.base == null }; }
+    return { lo: Math.min(...vals), hi: Math.max(...vals), approx: true };
+  }
+  if (p.token_out){ const c = p.token_out * 1300 * (RES_TOKENS[key] ?? 1); return { lo: c, hi: c, approx: true, tokens: true }; }
+  return null;
+}
+// Средняя фактическая цена прошлых генераций этой модели (для моделей с оплатой по токенам).
+function historyCost(modelId, res){
+  const same = items.filter(i => i.model === modelId && typeof i.cost === 'number' && i.cost > 0);
+  const exact = same.filter(i => !res || !i.resolution || i.resolution === res);
+  const pool = exact.length ? exact : same;
+  return pool.length ? pool.reduce((t, i) => t + i.cost, 0) / pool.length : null;
+}
+function estimate(modelId, res, n, nIn){
+  const m = models.find(x => x.id === modelId);
+  if (!m || !m.price) return null;
+  let o = outCost(m, res); if (!o) return null;
+  let hist = false;
+  if (o.tokens){ const h = historyCost(modelId, res); if (h != null){ o = { lo: h, hi: h, approx: true, tokens: true }; hist = true; } }
+  const inC = (m.price.in_image || 0) * nIn;
+  const lo = (o.lo + inC) * n, hi = (o.hi + inC) * n;
+  const per = o.lo === o.hi ? money(o.lo + inC) : money(o.lo + inC) + '–' + money(o.hi + inC);
+  const parts = [];
+  if (n > 1) parts.push(n + ' × ' + per);
+  if (res && !o.tokens) parts.push(res);
+  if (inC) parts.push('вместе с ' + nIn + ' вх. картинками');
+  if (o.tokens) parts.push(hist ? 'по твоим прошлым генерациям' : 'оплата по токенам, точная цена после генерации');
+  return { lo, hi, approx: !!o.approx, text: (o.approx ? '≈ ' : '') + (lo === hi ? money(hi) : money(lo) + '–' + money(hi).slice(1)), note: parts.join(' · ') };
+}
+function showCost(id, est){
+  const el = $('#' + id);
+  if (!est){ el.hidden = false; el.classList.remove('high'); el.replaceChildren(document.createTextNode('Цена этой модели неизвестна, итог виден после генерации.')); return; }
+  const b = document.createElement('b'); b.textContent = est.text;
+  const lead = document.createTextNode('Будет стоить ');
+  el.replaceChildren(lead, b);
+  if (est.note){ const sm = document.createElement('small'); sm.textContent = est.note; el.append(sm); }
+  el.classList.toggle('high', est.hi >= 0.3);
+}
+function costGenerate(){ return estimate($('#model').value, radio('res'), Number(radio('n') || 1), refs.length); }
+function costEdit(){ return estimate($('#ed-model').value, null, 1, 2); }
+function costUpscale(){ return estimate($('#up-model').value, radio('upres'), 1, 1); }
+function updateCost(){ showCost('cost', costGenerate()); showCost('ed-cost', costEdit()); showCost('up-cost', costUpscale()); }
 function price(m){
   const p = m.price || {};
-  if (p.image) return ' · ~$' + Number(p.image).toFixed(3) + ' за картинку';
-  if (p.token) return ' · оплата по токенам, итог виден после генерации';
+  if (p.variants){
+    const vals = Object.values(p.variants);
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    return lo === hi ? ' · ~' + money(lo) + ' за картинку' : ' · от ' + money(lo) + ' до ' + money(hi) + ' за картинку, зависит от разрешения';
+  }
+  if (p.token_out) return ' · оплата по токенам, около ' + money(p.token_out * 1300) + ' за картинку 1K';
   return '';
 }
 // Если данных о возможностях модели нет (запасной список), разрешено всё.
@@ -329,6 +396,7 @@ function applyCaps(m){
   $('#seed').disabled = known(m, 'seed') && !m.seed;
   $('#seed').placeholder = $('#seed').disabled ? 'эта модель не поддерживает' : 'случайный';
   renderRefs();
+  updateCost();
 }
 function maxRefs(){ const m = models.find(x => x.id === $('#model').value); return Math.min(6, known(m, 'refs') ? m.refs : 6); }
 function showModel(){
@@ -338,11 +406,16 @@ function showModel(){
   applyCaps(m);
 }
 $('#model').addEventListener('change', showModel);
+$('#form').addEventListener('change', updateCost);
+$('#ed-model').addEventListener('change', updateCost);
+$('#up-model').addEventListener('change', updateCost);
+$('#up-res').addEventListener('change', updateCost);
 
 /* ---------- references ---------- */
 function renderRefs(){
   const cap = maxRefs();
   $('#ref-count').textContent = cap === 0 ? 'модель не принимает референсы' : (refs.length ? refs.length + ' из ' + cap : 'до ' + cap);
+  if ($('#cost')) updateCost();
   $('#refs').replaceChildren(...refs.map((r, i) => {
     const row = document.createElement('div'); row.className = 'ref';
     const img = document.createElement('img'); img.src = blobUrl(r.asset); img.alt = 'Референс ' + (i + 1);
@@ -381,7 +454,7 @@ function render(){
   const open = jobs.filter(j => j.status !== 'done');
   const waits = open.flatMap(j => Array.from({ length: j.status === 'error' ? 1 : (j.n || 1) }, () => {
     const d = document.createElement('div'); d.className = 'tile wait' + (j.status === 'error' ? ' failed' : '');
-    d.textContent = j.status === 'error' ? 'Ошибка: ' + (j.error || 'не получилось') : (j.status === 'working' ? 'Claude рисует…' : 'Ждёт «го»');
+    d.textContent = j.status === 'error' ? 'Ошибка: ' + (j.error || 'не получилось') : (j.status === 'working' ? 'Claude рисует…' : 'Ждёт «го»' + (j.estimate ? ' · до ' + money(j.estimate) : ''));
     if (j.status === 'error'){ const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = 'убрать'; x.addEventListener('click', () => db.doc('jobs/' + j.id).delete().catch(() => {})); d.append(x); }
     return d;
   }));
@@ -391,7 +464,8 @@ function render(){
   $('#count').textContent = items.length + ' шт.' + (total ? ' · потрачено $' + total.toFixed(2) : '');
   const waiting = jobs.filter(j => j.status === 'sent').length;
   $('#queue').hidden = !waiting;
-  $('#queue').textContent = waiting ? `В очереди ${waiting}. Напиши Claude в чат «го».` : '';
+  const sum = jobs.filter(j => j.status === 'sent').reduce((t, j) => t + (j.estimate || 0), 0);
+  $('#queue').textContent = waiting ? `В очереди ${waiting}${sum ? ', вместе до ' + money(sum) : ''}. Напиши Claude в чат «го».` : '';
 }
 
 $('#upload').addEventListener('change', async e => {
@@ -429,7 +503,7 @@ $('#form').addEventListener('submit', async e => {
     await addJob({ mode: 'generate', model: $('#model').value, prompt, negative: $('#negative').value.trim(),
       style: style[0], styleText: style[2] || '', aspect_ratio: radio('ratio'), resolution: radio('res'),
       n: Number(radio('n') || 1), seed: Number.isInteger(seedVal) ? seedVal : null,
-      refs: refs.map(r => ({ asset: r.asset, role: r.role })) });
+      refs: refs.map(r => ({ asset: r.asset, role: r.role })), estimate: (costGenerate() || {}).hi ?? null });
     say('Поставлено в очередь. Напиши Claude в чат «го».');
   } catch (err) { say('Не получилось поставить в очередь.', true); }
   finally { $('#go').disabled = false; }
@@ -519,7 +593,7 @@ $('#ed-go').addEventListener('click', async () => {
   try {
     const mask = await upload(await canvasBlob(bw));
     await addJob({ mode: 'edit', model: $('#ed-model').value, prompt: text, source: edSource.asset, mask,
-      keep: $('#ed-keep').checked, aspect_ratio: nearestRatio(edImg.width, edImg.height) });
+      keep: $('#ed-keep').checked, aspect_ratio: nearestRatio(edImg.width, edImg.height), estimate: (costEdit() || {}).hi ?? null });
     $('#ed').close(); say('Правка в очереди. Напиши Claude в чат «го».');
   } catch (e) { sayIn('ed-msg', e.message, true); }
   finally { btn.disabled = false; }
@@ -535,7 +609,7 @@ $('#up-go').addEventListener('click', async () => {
     const src = await loadImg(blobUrl(upSource.asset));
     await addJob({ mode: 'upscale', model: $('#up-model').value, source: upSource.asset, creativity: Number(radio('level')),
       resolution: radio('upres'), mix: Number($('#up-mix').value), prompt: $('#up-text').value.trim(),
-      aspect_ratio: nearestRatio(src.naturalWidth, src.naturalHeight) });
+      aspect_ratio: nearestRatio(src.naturalWidth, src.naturalHeight), estimate: (costUpscale() || {}).hi ?? null });
     $('#up').close(); say('Увеличение в очереди. Напиши Claude в чат «го».');
   } catch (e) { sayIn('up-msg', 'Не получилось поставить в очередь.', true); }
   finally { btn.disabled = false; }
@@ -557,7 +631,7 @@ $('#lb-up').addEventListener('click', () => current && openUpscale(current));
   if (!sample) $('#enhance').hidden = true;
   db.doc('config/models').onSnapshot(s => { const d = s.exists ? s.data() : null; if (d && Array.isArray(d.list) && d.list.length){ models = d.list; fillModels(); } });
   db.collection('images').orderBy('createdAt', 'desc').limit(300).onSnapshot(s => {
-    items = s.docs.map(d => ({ id: d.id, ...(d.data() || {}) })); render();
+    items = s.docs.map(d => ({ id: d.id, ...(d.data() || {}) })); render(); updateCost();
     if (current && $('#lb').open){ const fresh = items.find(i => i.id === current.id); if (!fresh) $('#lb').close(); }
   }, () => say('Связь с хранилищем прервалась. Обнови страницу.', true));
   db.collection('jobs').orderBy('createdAt', 'desc').limit(50).onSnapshot(s => {
